@@ -10,6 +10,8 @@
 **/docs
 **/tests
 **/*.md
+# 【新增】排除规则的例外：允许 README.md 进入镜像（构建需要）
+!**/README.md
 
 # Build Artifacts and Cache
 **/__pycache__
