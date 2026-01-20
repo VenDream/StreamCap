@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy StreamGet
+COPY streamget ./streamget
+
 # Install Python dependencies
 COPY requirements-web.txt .
 RUN pip install --no-cache-dir -r requirements-web.txt
