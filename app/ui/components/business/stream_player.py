@@ -44,20 +44,28 @@ class StreamPlayer:
             )
             return
 
-        # 获取 API 端口和主机地址
+        # 获取主机地址
+        # 优先使用 VIDEO_API_EXTERNAL_URL（反向代理场景），否则直接访问 video API 端口
+        video_api_external_url = os.getenv("VIDEO_API_EXTERNAL_URL", "")
         video_api_port = os.getenv("VIDEO_API_PORT", "6007")
         page_url = self.app.page.url
-        if page_url:
+
+        if video_api_external_url:
+            # 使用配置的外部 URL（通过反向代理访问）
+            base_url = video_api_external_url.rstrip("/")
+        elif page_url:
+            # 从页面 URL 提取 host，直接访问 video API 端口
             parsed = urllib.parse.urlparse(page_url)
             host = parsed.hostname or "localhost"
+            base_url = f"http://{host}:{video_api_port}"
         else:
-            host = "localhost"
+            # 回退到本地
+            base_url = f"http://localhost:{video_api_port}"
 
-        # Video API 服务始终使用 http
         # 构建播放器 URL
         encoded_stream_url = urllib.parse.quote(stream_url, safe='')
         player_url = (
-            f"http://{host}:{video_api_port}/api/player"
+            f"{base_url}/api/player"
             f"?stream_url={encoded_stream_url}&stream_type={stream_type}"
         )
 
