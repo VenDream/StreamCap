@@ -354,11 +354,14 @@ class LiveStreamRecorder:
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             self.recording_start_time = time.time()
 
-            # 用于检测是否有实际数据写入
+            # 用于检测是否有实际数据写入和计算速度
             file_has_data = False
             min_file_size = 1024  # 最小有效文件大小（1KB）
-            file_check_interval = 5  # 每隔多少秒检查一次文件大小
+            file_check_interval = 1  # 每秒检查一次文件大小
             last_file_check_time = time.time()
+            last_file_size = 0  # 上次检查的文件大小
+            speed_samples = []  # 速度采样（用于平滑）
+            max_samples = 5  # 保留最近5次采样
 
             while True:
                 if self.should_stop or self.recording.force_stop or not self.app.recording_enabled:
@@ -395,16 +398,41 @@ class LiveStreamRecorder:
                     self.recording.is_recording = False
                     break
 
-                # 定期检查文件是否有实际数据写入
+                # 定期检查文件大小并计算速度
                 current_time = time.time()
-                if not file_has_data and current_time - last_file_check_time >= file_check_interval:
+                if current_time - last_file_check_time >= file_check_interval:
+                    time_elapsed = current_time - last_file_check_time
                     last_file_check_time = current_time
                     try:
-                        if os.path.exists(save_file_path):
-                            file_size = os.path.getsize(save_file_path)
-                            if file_size >= min_file_size:
+                        # 处理分段录制：找到最新的文件
+                        actual_file_path = save_file_path
+                        if '%' in save_file_path:
+                            # 分段录制，找到最新的文件
+                            import glob
+                            pattern = save_file_path.replace('%03d', '*')
+                            files = glob.glob(pattern)
+                            if files:
+                                actual_file_path = max(files, key=os.path.getmtime)
+
+                        if os.path.exists(actual_file_path):
+                            file_size = os.path.getsize(actual_file_path)
+                            if file_size >= min_file_size and not file_has_data:
                                 file_has_data = True
-                                logger.info(f"Recording file has valid data: {save_file_path} ({file_size} bytes)")
+                                logger.info(f"Recording file has valid data: {actual_file_path} ({file_size} bytes)")
+
+                            # 计算速度
+                            if last_file_size > 0:
+                                bytes_diff = file_size - last_file_size
+                                speed_kbps = (bytes_diff / 1024) / time_elapsed  # KB/s
+                                if speed_kbps > 0:  # 只在速度 > 0 时更新
+                                    speed_samples.append(speed_kbps)
+                                    if len(speed_samples) > max_samples:
+                                        speed_samples.pop(0)
+                                    # 使用平均值平滑速度显示
+                                    avg_speed = sum(speed_samples) / len(speed_samples)
+                                    self.recording.speed = f"{avg_speed:.1f} KB/s"
+
+                            last_file_size = file_size
                     except OSError as e:
                         logger.debug(f"Failed to check file size: {e}")
 
