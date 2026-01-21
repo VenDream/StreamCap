@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 
 import flet as ft
@@ -33,6 +34,7 @@ class App:
         self.is_web_mode = False
         self.auth_manager = None
         self.current_username = None
+        self.video_api_process = None  # 视频 API 服务进程
         self.content_area = ft.Column(
             controls=[],
             expand=True,
@@ -76,6 +78,9 @@ class App:
         self.page.run_task(self.record_manager.check_free_space)
         self.page.run_task(self._check_for_updates)
 
+        # 启动视频 API 服务
+        self.start_video_api_service()
+
     def initialize_pages(self):
         return {
             "settings": self.settings,
@@ -106,11 +111,43 @@ class App:
 
     async def cleanup(self):
         try:
+            # 停止视频 API 服务
+            if self.video_api_process:
+                try:
+                    self.video_api_process.terminate()
+                    self.video_api_process.wait(timeout=5)
+                    logger.info("Video API service stopped")
+                except Exception as e:
+                    logger.error(f"Error stopping video API service: {e}")
+                    try:
+                        self.video_api_process.kill()
+                    except:
+                        pass
+
             await self.process_manager.cleanup()
         except ConnectionError:
             logger.warning("Connection lost, process may have terminated")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+
+    def start_video_api_service(self):
+        """启动视频 API 服务"""
+        try:
+            import sys
+
+            # 获取当前 Python 解释器路径
+            python_executable = sys.executable
+
+            # 启动视频 API 服务
+            self.video_api_process = subprocess.Popen(
+                [python_executable, "-m", "app.api.video_stream_service"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=self.run_path
+            )
+            logger.info(f"Video API service started on port {os.getenv('VIDEO_API_PORT', '6007')}")
+        except Exception as e:
+            logger.error(f"Failed to start video API service: {e}")
 
     def add_ffmpeg_process(self, process):
         self.process_manager.add_process(process)

@@ -61,6 +61,7 @@
     "not_search_result": "提示：未搜索到任何结果",
     "toggle_view": "切换视图",
     "preview_video": "预览视频",
+    "flv_not_supported_in_browser": "提示：浏览器不支持 FLV 格式预览，请在桌面模式下使用或等待录制完成后查看文件",
     "status_filter": "状态筛选",
     "filter_all": "全部",
     "filter_recording": "录制中",
@@ -502,5 +503,20 @@
     "input_required": "请输入用户名和密码",
     "login_failed": "用户名或密码错误",
     "login_success": "登录成功"
+  },
+  "stream_player": {
+    "preview_title": "直播预览",
+    "cannot_get_preview_url": "无法获取预览地址",
+    "unsupported_format": "无法识别流格式，仅支持 M3U8 和 FLV 格式",
+    "stream_url_copied": "流地址已复制",
+    "streamer_label": "主播：",
+    "title_label": "标题：",
+    "platform_label": "平台：",
+    "recorded_label": "已录制：",
+    "format_label": "格式：",
+    "open_live_room": "打开直播间",
+    "copy_stream_url": "复制流地址",
+    "open_in_new_tab": "新标签打开",
+    "close": "关闭"
   }
 }

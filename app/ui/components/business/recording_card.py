@@ -11,7 +11,7 @@ from ...views.storage_view import StoragePage
 from ..dialogs.card_dialog import CardDialog
 from ..state.recording_card_state import RecordingCardState
 from .recording_dialog import RecordingDialog
-from .video_player import VideoPlayer
+from .stream_player import StreamPlayer
 
 
 class RecordingCardManager:
@@ -105,7 +105,7 @@ class RecordingCardManager:
             tooltip=self._["recording_info"],
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
         )
-        speed_text_label = ft.Text(speed, size=12)
+        speed_text_label = ft.Text(speed if recording.is_recording else "", size=12)  # 只在录制时显示速度
 
         status_label = self.create_status_label(recording)
 
@@ -225,7 +225,8 @@ class RecordingCardManager:
                     recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
 
                 if recording_card.get("speed_label"):
-                    recording_card["speed_label"].value = recording.speed
+                    # 只在录制时显示速度
+                    recording_card["speed_label"].value = recording.speed if recording.is_recording else ""
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)
@@ -408,6 +409,13 @@ class RecordingCardManager:
                     duration_label = self.cards_obj[recording.rec_id]["duration_label"]
                     duration_label.value = self.app.record_manager.get_duration(recording)
                     duration_label.update()
+
+                    # 同时更新速度显示
+                    speed_label = self.cards_obj[recording.rec_id].get("speed_label")
+                    if speed_label:
+                        # 只在录制时显示速度
+                        speed_label.value = recording.speed if recording.is_recording else ""
+                        speed_label.update()
                 except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                     logger.debug(f"Update duration failed: {e}")
                     break
@@ -489,9 +497,10 @@ class RecordingCardManager:
             logger.debug(f"Show delete dialog failed: {e}")
 
     async def preview_video_button_on_click(self, _, recording: Recording):
-        if self.app.page.web and recording.record_url:
-            video_player = VideoPlayer(self.app)
-            await video_player.preview_video(recording.preview_url, is_file_path=False, room_url=recording.url)
+        if self.app.page.web and recording.preview_url:
+            # Web 模式：使用流播放器预览直播流
+            stream_player = StreamPlayer(self.app)
+            await stream_player.preview_stream(recording)
         elif recording.recording_dir and os.path.exists(recording.recording_dir):
             video_files = []
             for root, _, files in os.walk(recording.recording_dir):

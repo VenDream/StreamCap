@@ -12,7 +12,7 @@ import aiofiles
 from cachetools import TTLCache
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 dotenv_path = find_dotenv()
@@ -183,6 +183,117 @@ async def file_sender_range(video_path: Path, start: int, end: int):
         if len(full_chunk) < 1024 * 1024:
             CHUNK_CACHE[cache_key] = full_chunk
         yield full_chunk
+
+
+@app.get("/api/player")
+async def get_player(stream_url: str = Query(...), stream_type: str = Query(...)):
+    """
+    流媒体播放器页面（纯视频，无其他UI元素）
+    :param stream_url: 流地址
+    :param stream_type: 流类型 (m3u8/flv)
+    """
+    # HTML 内容包含内联 CSS，忽略行长度检查
+    if stream_type == "m3u8":
+        # 使用 hls.js 播放 M3U8
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+html,body{{width:100%;height:100%;background:#000;overflow:hidden}}
+video{{width:100%;height:100%;object-fit:contain}}
+.error{{color:#ff6b6b;text-align:center;padding:20px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}}
+</style>
+</head>
+<body>
+<video id="video" controls autoplay muted></video>
+<div id="error" class="error" style="display:none;"></div>
+<script>
+var video = document.getElementById('video');
+var errorDiv = document.getElementById('error');
+var videoSrc = '{stream_url}';
+if (Hls.isSupported()) {{
+    var hls = new Hls({{enableWorker:true,lowLatencyMode:true,backBufferLength:90}});
+    hls.loadSource(videoSrc);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {{ video.play(); }});
+    hls.on(Hls.Events.ERROR, function(event, data) {{
+        if (data.fatal) {{
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Error: ' + data.details;
+        }}
+    }});
+}} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
+    video.src = videoSrc;
+    video.addEventListener('loadedmetadata', function() {{ video.play(); }});
+}} else {{
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = 'Browser does not support HLS';
+}}
+</script>
+</body>
+</html>"""
+    elif stream_type == "flv":
+        # 使用 flv.js 播放 FLV
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/flv.js@latest"></script>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+html,body{{width:100%;height:100%;background:#000;overflow:hidden}}
+video{{width:100%;height:100%;object-fit:contain}}
+.error{{color:#ff6b6b;text-align:center;padding:20px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}}
+</style>
+</head>
+<body>
+<video id="video" controls autoplay muted></video>
+<div id="error" class="error" style="display:none;"></div>
+<script>
+var video = document.getElementById('video');
+var errorDiv = document.getElementById('error');
+if (flvjs.isSupported()) {{
+    var flvPlayer = flvjs.createPlayer({{
+        type:'flv',url:'{stream_url}',isLive:true,hasAudio:true,hasVideo:true
+    }}, {{
+        enableWorker:false,enableStashBuffer:true,stashInitialSize:128,autoCleanupSourceBuffer:true
+    }});
+    flvPlayer.attachMediaElement(video);
+    flvPlayer.load();
+    flvPlayer.play();
+    flvPlayer.on(flvjs.Events.ERROR, function(errorType, errorDetail) {{
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = 'Error: ' + errorDetail;
+    }});
+}} else {{
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = 'Browser does not support FLV';
+}}
+</script>
+</body>
+</html>"""
+    else:
+        html_content = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+*{margin:0;padding:0}
+html,body{width:100%;height:100%;background:#000;display:flex;justify-content:center;align-items:center}
+.error{color:#ff6b6b;text-align:center}
+</style>
+</head>
+<body>
+<div class="error">Unsupported format</div>
+</body>
+</html>"""
+
+    return HTMLResponse(content=html_content)
 
 
 if __name__ == "__main__":

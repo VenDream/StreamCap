@@ -61,6 +61,7 @@
     "not_search_result": "Tip: No search results found",
     "toggle_view": "Toggle View",
     "preview_video": "Preview Video",
+    "flv_not_supported_in_browser": "Tip: Browser does not support FLV format preview. Please use desktop mode or wait for recording to complete.",
     "status_filter": "Status Filter",
     "filter_all": "All",
     "filter_recording": "Recording",
@@ -502,5 +503,20 @@
     "input_required": "Please enter username and password",
     "login_failed": "Username or password is incorrect",
     "login_success": "Login successful"
+  },
+  "stream_player": {
+    "preview_title": "Live Preview",
+    "cannot_get_preview_url": "Cannot get preview URL",
+    "unsupported_format": "Unsupported format, only M3U8 and FLV are supported",
+    "stream_url_copied": "Stream URL copied",
+    "streamer_label": "Streamer: ",
+    "title_label": "Title: ",
+    "platform_label": "Platform: ",
+    "recorded_label": "Recorded: ",
+    "format_label": "Format: ",
+    "open_live_room": "Open Live Room",
+    "copy_stream_url": "Copy Stream URL",
+    "open_in_new_tab": "Open in New Tab",
+    "close": "Close"
   }
 }
