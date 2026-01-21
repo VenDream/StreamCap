@@ -240,6 +240,17 @@ class RecordingManager:
             logger.debug(f"Skip check_if_live because recorder is active: {recording.url}")
             return
 
+        # 检查是否在无效录制冷却期内
+        if recording.last_invalid_recording_time:
+            elapsed = (datetime.now() - recording.last_invalid_recording_time).total_seconds()
+            cooldown = recording.invalid_recording_cooldown
+            if elapsed < cooldown:
+                logger.debug(
+                    f"Skip check_if_live: in invalid recording cooldown period "
+                    f"({elapsed:.0f}s < {cooldown}s), url={recording.url}"
+                )
+                return
+
         if not recording.monitor_status:
             recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
             recording.status_info = RecordingStatus.STOPPED_MONITORING

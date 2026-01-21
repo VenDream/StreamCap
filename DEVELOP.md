@@ -1,0 +1,128 @@
+# StreamCap 开发环境指南
+
+## 环境要求
+
+| 依赖 | 版本要求 |
+|------|----------|
+| Python | >= 3.10 |
+| FFmpeg | 最新版 |
+| uv (推荐) 或 pip | 最新版 |
+
+## 快速开始
+
+### 1. 安装系统依赖
+
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg -y
+```
+
+### 2. 初始化项目
+
+```bash
+# 克隆项目（如果还没有）
+git clone https://github.com/ihmily/StreamCap.git
+cd StreamCap
+
+# 初始化子模块
+git submodule update --init --recursive
+
+# 创建配置文件
+cp .env.example .env
+```
+
+### 3. 安装 Python 依赖
+
+**方式一：使用 uv（推荐）**
+
+```bash
+# 创建虚拟环境
+uv venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+
+# 安装 pip（Flet 内部需要）
+uv pip install pip
+
+# 安装本地 streamget 子模块
+uv pip install -e ./streamget
+
+# 安装项目依赖
+uv pip install -r requirements.txt
+```
+
+**方式二：使用 pip**
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+
+pip install -e ./streamget
+pip install -r requirements.txt
+```
+
+**方式三：使用 Poetry**
+
+```bash
+poetry install
+```
+
+### 4. 启动应用
+
+**桌面模式**（Windows/macOS）：
+
+```bash
+python main.py
+```
+
+**Web 模式**（Linux 或任意系统）：
+
+```bash
+python main.py --web
+```
+
+**自定义 Host/Port**：
+
+```bash
+python main.py --web --host 0.0.0.0 --port 8080
+```
+
+## 配置说明
+
+编辑 `.env` 文件可修改运行配置：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `PLATFORM` | 运行模式 (`desktop` / `web`) | `desktop` |
+| `HOST` | Web 服务监听地址 | `127.0.0.1` |
+| `PORT` | Web 服务端口 | `6006` |
+| `VIDEO_API_PORT` | 视频 API 端口 | `6007` |
+| `TZ` | 时区 | `Asia/Shanghai` |
+
+## WSL 用户注意
+
+如果在 WSL 中运行，需要将 `HOST` 改为 `0.0.0.0` 才能从 Windows 访问：
+
+```bash
+# 修改 .env
+HOST=0.0.0.0
+
+# 查看 WSL IP
+hostname -I | awk '{print $1}'
+
+# 访问地址：http://<WSL_IP>:6006
+```
+
+## 一键启动脚本
+
+```bash
+# uv 方式完整启动
+git submodule update --init --recursive && \
+cp .env.example .env && \
+uv venv && source .venv/bin/activate && \
+uv pip install pip && \
+uv pip install -e ./streamget && \
+uv pip install -r requirements.txt && \
+python main.py --web
+```

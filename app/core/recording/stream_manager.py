@@ -301,6 +301,19 @@ class LiveStreamRecorder:
         if not self.should_stop:
             # not manually stopped
             recording_duration = time.time() - self.recording_start_time
+
+            # 检查是否在无效录制冷却期内
+            if self.recording.last_invalid_recording_time:
+                elapsed = (datetime.now() - self.recording.last_invalid_recording_time).total_seconds()
+                cooldown = self.recording.invalid_recording_cooldown
+                if elapsed < cooldown:
+                    logger.info(
+                        f"Skip recheck_live_status: in invalid recording cooldown period "
+                        f"({elapsed:.0f}s < {cooldown}s), url={self.live_url}"
+                    )
+                    self.recording.status_info = RecordingStatus.MONITORING
+                    return
+
             if recording_duration > self.min_valid_recording_duration:
                 if self.app.recording_enabled and not self.is_flv_preferred_platform:
                     self.app.page.run_task(self.app.record_manager.check_if_live, self.recording)
@@ -341,6 +354,12 @@ class LiveStreamRecorder:
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             self.recording_start_time = time.time()
 
+            # 用于检测是否有实际数据写入
+            file_has_data = False
+            min_file_size = 1024  # 最小有效文件大小（1KB）
+            file_check_interval = 5  # 每隔多少秒检查一次文件大小
+            last_file_check_time = time.time()
+
             while True:
                 if self.should_stop or self.recording.force_stop or not self.app.recording_enabled:
                     logger.info(f"Preparing to End Recording: {live_url}")
@@ -376,12 +395,37 @@ class LiveStreamRecorder:
                     self.recording.is_recording = False
                     break
 
+                # 定期检查文件是否有实际数据写入
+                current_time = time.time()
+                if not file_has_data and current_time - last_file_check_time >= file_check_interval:
+                    last_file_check_time = current_time
+                    try:
+                        if os.path.exists(save_file_path):
+                            file_size = os.path.getsize(save_file_path)
+                            if file_size >= min_file_size:
+                                file_has_data = True
+                                logger.info(f"Recording file has valid data: {save_file_path} ({file_size} bytes)")
+                    except OSError as e:
+                        logger.debug(f"Failed to check file size: {e}")
+
                 await asyncio.sleep(1)
 
             return_code = process.returncode
             safe_return_code = [0, 255]
             stdout, stderr = await process.communicate()
-            
+
+            # 检测无效录制：FFmpeg 退出但文件没有有效数据
+            recording_duration = time.time() - self.recording_start_time
+            is_invalid_recording = False
+            if recording_duration < self.min_valid_recording_duration and not file_has_data:
+                # 录制时间很短且没有有效数据，标记为无效录制
+                is_invalid_recording = True
+                self.recording.last_invalid_recording_time = datetime.now()
+                logger.warning(
+                    f"Invalid recording detected: duration={recording_duration:.1f}s, "
+                    f"file_has_data={file_has_data}, url={live_url}"
+                )
+
             if return_code not in safe_return_code and stderr:
                 if not self.recording.is_recording:
                     logger.error(f"FFmpeg Stderr Output: {str(stderr.decode()).splitlines()[0]}")

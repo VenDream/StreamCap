@@ -83,6 +83,8 @@ class Recording:
         self.use_proxy = None
         self.record_url = None
         self.preview_url = None
+        self.last_invalid_recording_time = None  # 上次无效录制的时间，用于冷却期判断
+        self.invalid_recording_cooldown = 60  # 无效录制后的冷却时间（秒）
 
     def to_dict(self):
         """Convert the Recording instance to a dictionary for saving."""
