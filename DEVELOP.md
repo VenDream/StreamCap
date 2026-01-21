@@ -126,3 +126,60 @@ uv pip install -e ./streamget && \
 uv pip install -r requirements.txt && \
 python main.py --web
 ```
+
+## Git 配置
+
+### 配置 upstream（首次设置）
+
+本项目 fork 自 [ihmily/StreamCap](https://github.com/ihmily/StreamCap)，submodule 同样 fork 自 [ihmily/streamget](https://github.com/ihmily/streamget)。
+
+```bash
+# 主项目添加 upstream
+git remote add upstream https://github.com/ihmily/StreamCap.git
+
+# submodule 添加 upstream
+cd streamget
+git remote add upstream https://github.com/ihmily/streamget.git
+cd ..
+```
+
+### 同步 upstream 代码
+
+定期从原仓库同步最新代码：
+
+```bash
+# 1. 同步 submodule
+cd streamget
+git fetch upstream
+git merge upstream/main
+git push origin main
+cd ..
+
+# 2. 同步主项目
+git fetch upstream
+git merge upstream/main
+
+# 3. 更新主项目对 submodule 的引用
+git add streamget
+git commit -m "chore: sync submodule with upstream"
+git push
+```
+
+### 提交代码流程
+
+由于使用了 submodule，提交时需要先提交 submodule，再提交主项目：
+
+```bash
+# 1. 提交 submodule（如果有改动）
+cd streamget
+git add .
+git commit -m "your commit message"
+git push
+cd ..
+
+# 2. 提交主项目
+git add .
+git commit -m "your commit message"
+git push
+```
+
