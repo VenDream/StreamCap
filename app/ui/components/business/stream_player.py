@@ -50,20 +50,14 @@ class StreamPlayer:
         if page_url:
             parsed = urllib.parse.urlparse(page_url)
             host = parsed.hostname or "localhost"
-            # ws -> http, wss -> https
-            scheme = parsed.scheme or "ws"
-            if scheme == "wss":
-                scheme = "https"
-            elif scheme == "ws":
-                scheme = "http"
         else:
             host = "localhost"
-            scheme = "http"
 
+        # Video API 服务始终使用 http
         # 构建播放器 URL
         encoded_stream_url = urllib.parse.quote(stream_url, safe='')
         player_url = (
-            f"{scheme}://{host}:{video_api_port}/api/player"
+            f"http://{host}:{video_api_port}/api/player"
             f"?stream_url={encoded_stream_url}&stream_type={stream_type}"
         )
 
