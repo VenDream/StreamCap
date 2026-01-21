@@ -61,7 +61,6 @@
     "not_search_result": "提示：未搜索到任何结果",
     "toggle_view": "切换视图",
     "preview_video": "预览视频",
-    "flv_not_supported_in_browser": "提示：浏览器不支持 FLV 格式预览，请在桌面模式下使用或等待录制完成后查看文件",
     "status_filter": "状态筛选",
     "filter_all": "全部",
     "filter_recording": "录制中",

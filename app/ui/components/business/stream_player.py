@@ -1,6 +1,5 @@
 import os
 import urllib.parse
-from datetime import datetime
 
 import flet as ft
 
