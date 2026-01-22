@@ -62,6 +62,23 @@ ruff check --fix .          # Auto-fix issues
 
 The mode is determined by `PLATFORM` env var or `--web` flag. Web mode uses `page.run_task()` for async operations and has responsive layout adjustments.
 
+## Code Style & Guidelines
+
+### Linting
+- Use **ruff** as the code linting tool
+- Activate venv before running: `source .venv/bin/activate && ruff check .`
+- Auto-fix issues: `source .venv/bin/activate && ruff check --fix .`
+
+### Naming Conventions
+- **Classes**: `PascalCase` (e.g., `RecordingManager`, `HomePage`)
+- **Functions/Methods**: `snake_case` (e.g., `setup_periodic_live_check`)
+- **Variables**: `snake_case` (e.g., `is_web_mode`)
+- **Constants**: `UPPER_CASE` (e.g., `PLATFORM`, `UPDATE_CHECK_INTERVAL`)
+
+### Error Handling
+- Use `try/except` blocks for external operations (network, file I/O, subprocesses).
+- Log errors using the project's logger: `from app.utils.logger import logger`.
+
 ## Git Workflow
 
 This is a fork. Submodule changes require a two-step commit:
