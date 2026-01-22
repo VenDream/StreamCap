@@ -209,17 +209,31 @@ video{{width:100%;height:100%;object-fit:contain}}
 </style>
 </head>
 <body>
-<video id="video" controls autoplay muted></video>
+<video id="video" controls autoplay muted playsinline webkit-playsinline></video>
 <div id="error" class="error" style="display:none;"></div>
 <script>
 var video = document.getElementById('video');
 var errorDiv = document.getElementById('error');
 var videoSrc = '{stream_url}';
+
+// 尝试自动播放，如果失败则静默处理
+function tryAutoPlay() {{
+    var playPromise = video.play();
+    if (playPromise !== undefined) {{
+        playPromise.catch(function(error) {{
+            // 自动播放被阻止，用户需要手动点击播放
+            console.log('Autoplay prevented:', error);
+        }});
+    }}
+}}
+
 if (Hls.isSupported()) {{
     var hls = new Hls({{enableWorker:true,lowLatencyMode:true,backBufferLength:90}});
     hls.loadSource(videoSrc);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, function() {{ video.play(); }});
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {{
+        tryAutoPlay();
+    }});
     hls.on(Hls.Events.ERROR, function(event, data) {{
         if (data.fatal) {{
             errorDiv.style.display = 'block';
@@ -228,7 +242,9 @@ if (Hls.isSupported()) {{
     }});
 }} else if (video.canPlayType('application/vnd.apple.mpegurl')) {{
     video.src = videoSrc;
-    video.addEventListener('loadedmetadata', function() {{ video.play(); }});
+    video.addEventListener('loadedmetadata', function() {{
+        tryAutoPlay();
+    }});
 }} else {{
     errorDiv.style.display = 'block';
     errorDiv.textContent = 'Browser does not support HLS';
@@ -252,11 +268,23 @@ video{{width:100%;height:100%;object-fit:contain}}
 </style>
 </head>
 <body>
-<video id="video" controls autoplay muted></video>
+<video id="video" controls autoplay muted playsinline webkit-playsinline></video>
 <div id="error" class="error" style="display:none;"></div>
 <script>
 var video = document.getElementById('video');
 var errorDiv = document.getElementById('error');
+
+// 尝试自动播放，如果失败则静默处理
+function tryAutoPlay() {{
+    var playPromise = video.play();
+    if (playPromise !== undefined) {{
+        playPromise.catch(function(error) {{
+            // 自动播放被阻止，用户需要手动点击播放
+            console.log('Autoplay prevented:', error);
+        }});
+    }}
+}}
+
 if (flvjs.isSupported()) {{
     var flvPlayer = flvjs.createPlayer({{
         type:'flv',url:'{stream_url}',isLive:true,hasAudio:true,hasVideo:true
@@ -265,7 +293,12 @@ if (flvjs.isSupported()) {{
     }});
     flvPlayer.attachMediaElement(video);
     flvPlayer.load();
-    flvPlayer.play();
+
+    // 等待数据加载后尝试播放
+    video.addEventListener('loadedmetadata', function() {{
+        tryAutoPlay();
+    }});
+
     flvPlayer.on(flvjs.Events.ERROR, function(errorType, errorDetail) {{
         errorDiv.style.display = 'block';
         errorDiv.textContent = 'Error: ' + errorDetail;
