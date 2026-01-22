@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import time
+import urllib.parse
 from datetime import datetime
 from typing import TypeVar
 
@@ -176,7 +177,20 @@ class LiveStreamRecorder:
         return url
 
     def set_preview_url(self, stream_info: StreamData):
-        self.recording.preview_url = stream_info.m3u8_url or stream_info.flv_url
+        preview_url = stream_info.m3u8_url or stream_info.flv_url
+
+        # 如果配置了外部视频 API URL（反向代理场景），继承其协议
+        video_api_external_url = os.getenv("VIDEO_API_EXTERNAL_URL", "")
+        if video_api_external_url and preview_url:
+            parsed = urllib.parse.urlparse(video_api_external_url)
+            target_scheme = parsed.scheme  # 提取环境变量的协议（http/https）
+
+            if target_scheme == "https" and preview_url.startswith("http://"):
+                preview_url = preview_url.replace("http://", "https://")
+            elif target_scheme == "http" and preview_url.startswith("https://"):
+                preview_url = preview_url.replace("https://", "http://")
+
+        self.recording.preview_url = preview_url
 
     def _get_record_format(self, stream_info: StreamData):
         use_flv_record = ["shopee"]
