@@ -886,6 +886,9 @@ class LiveStreamRecorder:
                 "[time]", push_at).replace("[title]", self.recording.live_title or "None")
             msg_title = user_config.get("custom_notification_title").strip()
             msg_title = msg_title or self._["status_notify"]
+            # 支持标题中的变量替换
+            msg_title = msg_title.replace("[room_name]", self.recording.streamer_name).replace(
+                "[time]", push_at).replace("[title]", self.recording.live_title or "None")
 
             self.app.page.run_task(msg_manager.push_messages, msg_title, push_content)
 

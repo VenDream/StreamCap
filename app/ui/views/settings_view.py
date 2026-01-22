@@ -547,11 +547,21 @@ class SettingsPage(PageBase):
                     [
                         self.create_setting_row(
                             self._["custom_push_title"],
-                            ft.TextField(
-                                value=self.get_config_value("custom_notification_title"),
-                                width=300,
-                                data="custom_notification_title",
-                                on_change=self.on_change,
+                            ft.Column(
+                                [
+                                    ft.TextField(
+                                        value=self.get_config_value("custom_notification_title"),
+                                        width=300,
+                                        data="custom_notification_title",
+                                        on_change=self.on_change,
+                                    ),
+                                    ft.Text(
+                                        "支持变量: [room_name] [time] [title]",
+                                        size=11,
+                                        color=ft.Colors.GREY_600,
+                                    ),
+                                ],
+                                spacing=5,
                             ),
                         ),
                         self.create_setting_row(
