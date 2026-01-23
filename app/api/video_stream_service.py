@@ -209,20 +209,24 @@ video{{width:100%;height:100%;object-fit:contain}}
 </style>
 </head>
 <body>
-<video id="video" controls autoplay muted playsinline webkit-playsinline></video>
+<video id="video" controls autoplay playsinline webkit-playsinline></video>
 <div id="error" class="error" style="display:none;"></div>
 <script>
 var video = document.getElementById('video');
 var errorDiv = document.getElementById('error');
 var videoSrc = '{stream_url}';
 
-// 尝试自动播放，如果失败则静默处理
+// 尝试有声自动播放，如果失败则回退到静音播放
 function tryAutoPlay() {{
     var playPromise = video.play();
     if (playPromise !== undefined) {{
         playPromise.catch(function(error) {{
-            // 自动播放被阻止，用户需要手动点击播放
-            console.log('Autoplay prevented:', error);
+            // 有声自动播放被阻止，尝试静音播放
+            console.log('Autoplay with sound prevented, trying muted:', error);
+            video.muted = true;
+            video.play().catch(function(err) {{
+                console.log('Muted autoplay also prevented:', err);
+            }});
         }});
     }}
 }}
@@ -268,19 +272,23 @@ video{{width:100%;height:100%;object-fit:contain}}
 </style>
 </head>
 <body>
-<video id="video" controls autoplay muted playsinline webkit-playsinline></video>
+<video id="video" controls autoplay playsinline webkit-playsinline></video>
 <div id="error" class="error" style="display:none;"></div>
 <script>
 var video = document.getElementById('video');
 var errorDiv = document.getElementById('error');
 
-// 尝试自动播放，如果失败则静默处理
+// 尝试有声自动播放，如果失败则回退到静音播放
 function tryAutoPlay() {{
     var playPromise = video.play();
     if (playPromise !== undefined) {{
         playPromise.catch(function(error) {{
-            // 自动播放被阻止，用户需要手动点击播放
-            console.log('Autoplay prevented:', error);
+            // 有声自动播放被阻止，尝试静音播放
+            console.log('Autoplay with sound prevented, trying muted:', error);
+            video.muted = true;
+            video.play().catch(function(err) {{
+                console.log('Muted autoplay also prevented:', err);
+            }});
         }});
     }}
 }}
