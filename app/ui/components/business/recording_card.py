@@ -95,10 +95,10 @@ class RecordingCardManager:
             weight=RecordingCardState.get_title_weight(recording),
         )
 
-        open_folder_button = ft.IconButton(
-            icon=ft.Icons.FOLDER,
-            tooltip=self._["open_folder"],
-            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_dir_button_on_click, e, rec),
+        open_live_room_button = ft.IconButton(
+            icon=ft.Icons.OPEN_IN_NEW,
+            tooltip=self._["open_live_room"],
+            on_click=lambda e, rec=recording: self.app.page.run_task(self.open_live_room_button_on_click, e, rec),
         )
         recording_info_button = ft.IconButton(
             icon=ft.Icons.INFO,
@@ -116,30 +116,41 @@ class RecordingCardManager:
             tight=True,
         )
 
+        button_row = ft.Row(
+            [
+                record_button,
+                monitor_button,
+                open_live_room_button,
+                recording_info_button,
+                preview_button,
+                edit_button,
+                delete_button,
+            ],
+            spacing=3,
+            alignment=ft.MainAxisAlignment.START,
+            scroll=ft.ScrollMode.HIDDEN,
+        )
+
         card_container = ft.Container(
             content=ft.Column(
                 [
-                    title_row,
-                    duration_text_label,
-                    speed_text_label,
-                    ft.Row(
+                    ft.Column(
                         [
-                            record_button,
-                            open_folder_button,
-                            recording_info_button,
-                            preview_button,
-                            edit_button,
-                            delete_button,
-                            monitor_button
+                            title_row,
+                            duration_text_label,
+                            speed_text_label,
                         ],
                         spacing=3,
                         alignment=ft.MainAxisAlignment.START,
-                        scroll=ft.ScrollMode.HIDDEN
+                        tight=True,
                     ),
+                    ft.Container(expand=True),
+                    button_row,
                 ],
                 spacing=3,
-                tight=True
+                expand=True,
             ),
+            expand=True,
             padding=8,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_card_on_click, e, rec),
             bgcolor=self.get_card_background_color(recording),
@@ -150,11 +161,12 @@ class RecordingCardManager:
 
         return {
             "card": card,
+            "title_row": title_row,
             "display_title_label": display_title_label,
             "duration_label": duration_text_label,
             "speed_label": speed_text_label,
             "record_button": record_button,
-            "open_folder_button": open_folder_button,
+            "open_live_room_button": open_live_room_button,
             "recording_info_button": recording_info_button,
             "edit_button": edit_button,
             "monitor_button": monitor_button,
@@ -204,22 +216,26 @@ class RecordingCardManager:
                     recording_card["display_title_label"].weight = RecordingCardState.get_title_weight(recording)
 
                 new_status_label = self.create_status_label(recording)
+                title_row = recording_card.get("title_row")
+                current_status_label = recording_card.get("status_label")
 
-                if recording_card["card"] and recording_card["card"].content and recording_card["card"].content.content:
-                    title_row = recording_card["card"].content.content.controls[0]
+                if title_row:
                     title_row.alignment = ft.MainAxisAlignment.START
                     title_row.spacing = 5
                     title_row.tight = True
 
-                    # Update the status label if it exists
                     if new_status_label:
-                        if len(title_row.controls) > 1:
-                            title_row.controls[1] = new_status_label
+                        if current_status_label:
+                            current_status_label.content.value = new_status_label.content.value
+                            current_status_label.content.color = new_status_label.content.color
+                            current_status_label.bgcolor = new_status_label.bgcolor
                         else:
                             title_row.controls.append(new_status_label)
+                            recording_card["status_label"] = new_status_label
                     else:
-                        if len(title_row.controls) > 1:
-                            title_row.controls.pop()
+                        if current_status_label and current_status_label in title_row.controls:
+                            title_row.controls.remove(current_status_label)
+                        recording_card["status_label"] = None
 
                 if recording_card.get("duration_label"):
                     recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
@@ -396,6 +412,10 @@ class RecordingCardManager:
     def get_tip_for_monitor_state(self, recording: Recording):
         return self._["stop_monitor"] if recording.monitor_status else self._["start_monitor"]
 
+    @staticmethod
+    def can_update_control(control: ft.Control | None) -> bool:
+        return control is not None and getattr(control, "page", None) is not None
+
     async def update_duration(self, recording: Recording):
         """Update the duration text periodically."""
         while True:
@@ -408,14 +428,16 @@ class RecordingCardManager:
                 try:
                     duration_label = self.cards_obj[recording.rec_id]["duration_label"]
                     duration_label.value = self.app.record_manager.get_duration(recording)
-                    duration_label.update()
+                    if self.can_update_control(duration_label):
+                        duration_label.update()
 
                     # 同时更新速度显示
                     speed_label = self.cards_obj[recording.rec_id].get("speed_label")
                     if speed_label:
                         # 只在录制时显示速度
                         speed_label.value = recording.speed if recording.is_recording else ""
-                        speed_label.update()
+                        if self.can_update_control(speed_label):
+                            speed_label.update()
                 except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                     logger.debug(f"Update duration failed: {e}")
                     break
@@ -441,13 +463,11 @@ class RecordingCardManager:
         except Exception as e:
             logger.debug(f"Handle card click event failed: {e}")
 
-    async def recording_dir_on_click(self, recording: Recording):
-        if recording.recording_dir:
-            if os.path.exists(recording.recording_dir):
-                if not utils.open_folder(recording.recording_dir):
-                    await self.app.snack_bar.show_snack_bar(self._['no_video_file'])
-            else:
-                await self.app.snack_bar.show_snack_bar(self._["no_recording_folder"])
+    async def open_live_room_on_click(self, recording: Recording):
+        if recording.url and utils.is_valid_url(recording.url):
+            self.app.page.launch_url(recording.url, web_window_name="_blank")
+        else:
+            await self.app.snack_bar.show_snack_bar(self._["no_live_room_url_tip"])
 
     async def edit_recording_button_click(self, _, recording: Recording):
         """Handle edit button click by showing the edit dialog with existing recording info."""
@@ -520,8 +540,8 @@ class RecordingCardManager:
     async def recording_button_on_click(self, _, recording: Recording):
         await self.on_toggle_recording(recording)
 
-    async def recording_dir_button_on_click(self, _, recording: Recording):
-        await self.recording_dir_on_click(recording)
+    async def open_live_room_button_on_click(self, _, recording: Recording):
+        await self.open_live_room_on_click(recording)
 
     async def recording_info_button_on_click(self, _, recording: Recording):
         await self.show_recording_info_dialog(recording)

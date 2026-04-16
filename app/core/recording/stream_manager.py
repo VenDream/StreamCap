@@ -311,6 +311,17 @@ class LiveStreamRecorder:
         except Exception as e:
             logger.error(f"Failed to remove recorder instance: {e}")
 
+    async def sync_recording_started(self, record_url: str):
+        self.recording.is_recording = True
+        self.recording.status_info = RecordingStatus.RECORDING
+        self.recording.record_url = record_url
+
+        try:
+            await self.app.record_card_manager.update_card(self.recording)
+            self.app.page.pubsub.send_others_on_topic("update", self.recording)
+        except Exception as e:
+            logger.debug(f"Failed to sync recording started state: {e}")
+
     async def recheck_live_status(self):
         if not self.should_stop:
             # not manually stopped
@@ -362,8 +373,7 @@ class LiveStreamRecorder:
             )
 
             self.app.add_ffmpeg_process(process)
-            self.recording.status_info = RecordingStatus.RECORDING
-            self.recording.record_url = record_url
+            await self.sync_recording_started(record_url)
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             self.recording_start_time = time.time()
@@ -765,8 +775,7 @@ class LiveStreamRecorder:
         try:
             await self.direct_downloader.start_download()
 
-            self.recording.status_info = RecordingStatus.RECORDING
-            self.recording.record_url = record_url
+            await self.sync_recording_started(record_url)
             logger.info(f"Direct Downloading: {live_url}")
             logger.log("STREAM", f"Direct Download Stream URL: {record_url}")
             self.recording_start_time = time.time()

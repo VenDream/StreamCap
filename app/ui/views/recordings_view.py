@@ -15,6 +15,12 @@ from ..filters import RecordingFilters
 
 
 class RecordingsPage(PageBase):
+    MOBILE_GRID_COLUMN_WIDTH = 250
+    DESKTOP_GRID_COLUMN_WIDTH = 380
+    MOBILE_GRID_CHILD_ASPECT_RATIO = 2.5
+    DESKTOP_GRID_CHILD_ASPECT_RATIO = 2.8
+    DESKTOP_GRID_RESERVED_WIDTH = 160
+
     def __init__(self, app):
         super().__init__(app)
         self.page_name = "recordings"
@@ -41,14 +47,16 @@ class RecordingsPage(PageBase):
             stroke_width=3,
             visible=False
         )
+
+        column_width, child_aspect_ratio = self.get_grid_layout_config()
         
         if self.is_grid_view:
             initial_content = ft.GridView(
                 expand=True,
-                runs_count=3,
+                runs_count=self.get_grid_runs_count(column_width),
                 spacing=10,
                 run_spacing=10,
-                child_aspect_ratio=2.3,
+                child_aspect_ratio=child_aspect_ratio,
                 controls=[]
             )
         else:
@@ -93,13 +101,24 @@ class RecordingsPage(PageBase):
         self.app.page.pubsub.subscribe_topic('add', self.subscribe_add_cards)
         self.app.page.pubsub.subscribe_topic('delete_all', self.subscribe_del_all_cards)
 
+    def get_grid_layout_config(self) -> tuple[int, float]:
+        if getattr(self.app, "is_mobile", False):
+            return self.MOBILE_GRID_COLUMN_WIDTH, self.MOBILE_GRID_CHILD_ASPECT_RATIO
+        return self.DESKTOP_GRID_COLUMN_WIDTH, self.DESKTOP_GRID_CHILD_ASPECT_RATIO
+
+    def get_grid_runs_count(self, column_width: int) -> int:
+        available_width = self.page.width
+        if not getattr(self.app, "is_mobile", False):
+            available_width = max(column_width, available_width - self.DESKTOP_GRID_RESERVED_WIDTH)
+        return max(1, int(available_width / column_width))
+
     async def toggle_view_mode(self, _):
         self.is_grid_view = not self.is_grid_view
         current_content = self.recording_card_area.content
         current_controls = current_content.controls if hasattr(current_content, 'controls') else []
 
-        column_width = 350
-        runs_count = max(1, int(self.page.width / column_width))
+        column_width, child_aspect_ratio = self.get_grid_layout_config()
+        runs_count = self.get_grid_runs_count(column_width)
 
         if self.is_grid_view:
             new_content = ft.GridView(
@@ -107,7 +126,7 @@ class RecordingsPage(PageBase):
                 runs_count=runs_count,
                 spacing=10,
                 run_spacing=10,
-                child_aspect_ratio=2.3,
+                child_aspect_ratio=child_aspect_ratio,
                 controls=current_controls
             )
         else:
@@ -705,14 +724,8 @@ class RecordingsPage(PageBase):
         if not self.is_grid_view:
             return
 
-        if self.app.is_mobile:
-            column_width = 250
-            child_aspect_ratio = 2.5
-        else:
-            column_width = 350
-            child_aspect_ratio = 2.3
-
-        runs_count = max(1, int(self.page.width / column_width))
+        column_width, child_aspect_ratio = self.get_grid_layout_config()
+        runs_count = self.get_grid_runs_count(column_width)
 
         if isinstance(self.recording_card_area.content, ft.GridView):
             grid_view = self.recording_card_area.content

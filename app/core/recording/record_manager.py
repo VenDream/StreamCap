@@ -317,6 +317,15 @@ class RecordingManager:
         async with semaphore:
             stream_info = await recorder.fetch_stream()
             logger.info(f"Stream Data: {stream_info}")
+
+        # Another concurrent live check may have already started recording while this
+        # request was still fetching stream info. In that case, ignore this stale result
+        # so it does not overwrite the card back to monitoring/live state.
+        if recording.is_recording or recording.rec_id in self.active_recorders:
+            logger.debug(f"Skip stale live check result because recording is already active: {recording.url}")
+            recording.is_checking = False
+            return
+
         if not stream_info or not stream_info.anchor_name:
             logger.error(f"Fetch stream data failed: {recording.url}")
             recording.is_checking = False
@@ -466,10 +475,7 @@ class RecordingManager:
             # If recording, add the current session time.
             total_duration = recording.cumulative_duration + elapsed
             return self._["recorded"] + " " + str(total_duration).split(".")[0]
-        else:
-            # If stopped, show the last recorded total duration.
-            total_duration = recording.last_duration
-            return str(total_duration).split(".")[0]
+        return "0:00:00"
 
     async def delete_recording_cards(self, recordings: list[Recording]):
         self.app.page.run_task(self.app.record_card_manager.remove_recording_card, recordings)
