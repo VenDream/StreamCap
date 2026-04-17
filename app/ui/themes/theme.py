@@ -27,47 +27,46 @@ class PopupColorItem(ft.PopupMenuItem):
         page.run_task(app.config_manager.save_user_config, app.settings.user_config)
 
 
-def create_light_theme(custom_font: str) -> ft.Theme:
+def _create_text_style(color: str, custom_font: str | None) -> ft.TextStyle:
+    if custom_font:
+        return ft.TextStyle(color=color, font_family=custom_font)
+    return ft.TextStyle(color=color)
+
+
+def _create_text_theme(color: str, custom_font: str | None) -> ft.TextTheme:
+    return ft.TextTheme(
+        body_medium=_create_text_style(color, custom_font),
+        body_large=_create_text_style(color, custom_font),
+        display_small=_create_text_style(color, custom_font),
+        display_medium=_create_text_style(color, custom_font),
+        display_large=_create_text_style(color, custom_font),
+        headline_small=_create_text_style(color, custom_font),
+        headline_medium=_create_text_style(color, custom_font),
+        headline_large=_create_text_style(color, custom_font),
+        title_small=_create_text_style(color, custom_font),
+        title_medium=_create_text_style(color, custom_font),
+        title_large=_create_text_style(color, custom_font),
+        label_small=_create_text_style(color, custom_font),
+        label_medium=_create_text_style(color, custom_font),
+        label_large=_create_text_style(color, custom_font),
+    )
+
+
+def create_light_theme(custom_font: str | None) -> ft.Theme:
     """Define light colored theme"""
-    return ft.Theme(
-        font_family=custom_font,
-        text_theme=ft.TextTheme(
-            body_medium=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            body_large=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            display_small=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            display_medium=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            display_large=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            headline_small=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            headline_medium=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            headline_large=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            title_small=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            title_medium=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            title_large=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            label_small=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            label_medium=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-            label_large=ft.TextStyle(color=ft.Colors.BLACK, font_family=custom_font),
-        ),
-    )
+    theme_kwargs = {
+        "text_theme": _create_text_theme(ft.Colors.BLACK, custom_font),
+    }
+    if custom_font:
+        theme_kwargs["font_family"] = custom_font
+    return ft.Theme(**theme_kwargs)
 
 
-def create_dark_theme(custom_font: str) -> ft.Theme:
+def create_dark_theme(custom_font: str | None) -> ft.Theme:
     """Define dark theme"""
-    return ft.Theme(
-        font_family=custom_font,
-        text_theme=ft.TextTheme(
-            body_medium=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            body_large=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            display_small=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            display_medium=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            display_large=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            headline_small=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            headline_medium=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            headline_large=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            title_small=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            title_medium=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            title_large=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            label_small=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            label_medium=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-            label_large=ft.TextStyle(color=ft.Colors.WHITE, font_family=custom_font),
-        ),
-    )
+    theme_kwargs = {
+        "text_theme": _create_text_theme(ft.Colors.WHITE, custom_font),
+    }
+    if custom_font:
+        theme_kwargs["font_family"] = custom_font
+    return ft.Theme(**theme_kwargs)

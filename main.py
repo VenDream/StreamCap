@@ -139,6 +139,8 @@ async def main(page: ft.Page) -> None:
         page.theme_mode = ft.ThemeMode.DARK
     else:
         page.theme_mode = ft.ThemeMode.LIGHT
+
+    app.theme_manager.apply_initial_theme()
     
     save_progress_overlay = SaveProgressOverlay(app)
     page.overlay.append(save_progress_overlay.overlay)
@@ -195,7 +197,6 @@ async def main(page: ft.Page) -> None:
                 async def on_login_success(token):
                     _session_info = auth_manager.active_sessions.get(token, {})
                     app.current_username = _session_info.get("username")
-                    
                     page.clean()
                     await load_app()
                 

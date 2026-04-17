@@ -1,6 +1,6 @@
 import flet as ft
 
-from ..themes import PopupColorItem, ThemeManager
+from ..themes import PopupColorItem
 
 
 class ControlGroup:
@@ -69,7 +69,7 @@ class LeftNavigationMenu(ft.Column):
         self.dark_light_icon = None
         self.bottom_controls = None
         self.first_run = True
-        self.theme_manager = ThemeManager(self.app)
+        self.theme_manager = self.app.theme_manager
         self.app.language_manager.add_observer(self)
         self._ = {}
         self.load()
@@ -78,7 +78,7 @@ class LeftNavigationMenu(ft.Column):
         self._ = self.app.language_manager.language.get("sidebar")
         self.rail = NavigationColumn(sidebar=self.sidebar, page=self.page, app=self.app)
 
-        if self.page.theme_mode == ft.ThemeMode.DARK:
+        if self.app.settings.user_config.get("theme_mode", "light") == "dark":
             self.dark_light_text = ft.Text(self._["dark_theme"])
             self.dark_light_icon = ft.IconButton(
                 icon=ft.Icons.BRIGHTNESS_HIGH_OUTLINED,

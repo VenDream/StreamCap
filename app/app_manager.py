@@ -14,6 +14,7 @@ from .initialization.installation_manager import InstallationManager
 from .ui.components.business.recording_card import RecordingCardManager
 from .ui.components.common.show_snackbar import ShowSnackBar
 from .ui.navigation.sidebar import LeftNavigationMenu, NavigationSidebar
+from .ui.themes import ThemeManager
 from .ui.views.about_view import AboutPage
 from .ui.views.home_view import HomePage
 from .ui.views.recordings_view import RecordingsPage
@@ -52,6 +53,7 @@ class App:
         self.storage = StoragePage(self)
         self.pages = self.initialize_pages()
         self.sidebar = NavigationSidebar(self)
+        self.theme_manager = ThemeManager(self)
         self.left_navigation_menu = LeftNavigationMenu(self)
 
         self.snack_bar_area = ft.Container()

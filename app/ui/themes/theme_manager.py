@@ -12,11 +12,16 @@ class ThemeManager:
         self.custom_font = None
         self.theme_color = None
         self.assets_dir = app.assets_dir
-        self.init_fonts()
-        self.page.run_task(self.apply_initial_theme)
 
     def init_fonts(self):
         """Initialize fonts for the application."""
+        if self.app.is_web_mode:
+            # Avoid loading a large custom CJK font on web first paint. System fonts
+            # provide a better startup experience and prevent temporary tofu glyphs.
+            self.page.fonts = {}
+            self.custom_font = None
+            return
+
         custom_font = "AlibabaPuHuiTi Light"
         if sys.platform == "darwin":
             custom_font = "AlibabaPuHuiTi Light Mac"
@@ -27,19 +32,25 @@ class ThemeManager:
         }
         self.custom_font = custom_font
 
-    async def apply_initial_theme(self):
+    def apply_initial_theme(self):
         """Apply initial theme based on saved settings or default to light theme."""
+        self.init_fonts()
         self.page.theme = create_light_theme(self.custom_font)
         self.page.dark_theme = create_dark_theme(self.custom_font)
-        
+
         self.theme_color = self.app.settings.user_config.get("theme_color", "blue")
-        await self.update_theme_color(self.theme_color)
+        self.apply_theme_color(self.theme_color)
+
+    def apply_theme_color(self, color):
+        self.page.theme.color_scheme_seed = color
+        self.page.theme.color_scheme = ft.ColorScheme(primary=color)
+        self.page.dark_theme.color_scheme_seed = color
+        self.page.dark_theme.color_scheme = ft.ColorScheme(primary=color)
 
     async def update_theme_color(self, color):
         """Update the current theme color scheme and save it."""
-        self.page.theme.color_scheme_seed = color
-        self.page.theme.color_scheme = ft.ColorScheme(primary=color)
+        self.apply_theme_color(color)
         self.page.update()
-        
+
         self.app.settings.user_config["theme_color"] = color
         self.page.run_task(self.app.config_manager.save_user_config, self.app.settings.user_config)
