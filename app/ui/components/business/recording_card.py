@@ -120,11 +120,11 @@ class RecordingCardManager:
             [
                 record_button,
                 monitor_button,
-                open_live_room_button,
                 recording_info_button,
                 preview_button,
                 edit_button,
                 delete_button,
+                open_live_room_button,
             ],
             spacing=3,
             alignment=ft.MainAxisAlignment.START,
