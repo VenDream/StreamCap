@@ -297,7 +297,7 @@ class RecordingsPage(PageBase):
             content_padding=ft.padding.only(top=8, bottom=8, left=10, right=10),
             border_radius=5,
             border_color=ft.Colors.OUTLINE,
-            focused_border_color=ft.colors.PRIMARY,
+            focused_border_color=ft.Colors.PRIMARY,
             dense=True,
         )
         if len(current_platform_keys) > 8:

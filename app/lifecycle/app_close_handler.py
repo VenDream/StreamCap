@@ -103,12 +103,12 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 content=ft.Text(
                     _["minimize_to_tray_tip"],
                     size=12,
-                    color=ft.colors.GREY_500,
+                    color=ft.Colors.GREY_500,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 padding=ft.padding.all(8),
                 border_radius=5,
-                bgcolor=ft.colors.with_opacity(0.1, ft.colors.BLUE_GREY),
+                bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.BLUE_GREY),
             )
         )
 
@@ -117,14 +117,14 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
             content=ft.Text(_["cancel"], size=14),
             on_click=close_dialog,
             style=ft.ButtonStyle(
-                color=ft.colors.PRIMARY,
+                color=ft.Colors.PRIMARY,
             ),
         ),
         ft.OutlinedButton(
             content=ft.Text(_["exit_program"], size=14),
             on_click=close_dialog_dismissed,
             style=ft.ButtonStyle(
-                color=ft.colors.ERROR,
+                color=ft.Colors.ERROR,
             ),
         ),
     ]
@@ -134,7 +134,7 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 content=ft.Text(_["minimize_to_tray"], size=14),
                 on_click=minimize_to_tray,
                 style=ft.ButtonStyle(
-                    color=ft.colors.PRIMARY,
+                    color=ft.Colors.PRIMARY,
                 ),
             ))
 

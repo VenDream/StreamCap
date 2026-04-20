@@ -178,6 +178,7 @@ ffmpeg.exe
 ffplay.exe
 ffprobe.exe
 .worktrees/
+.codex
 
 claude.sh
 codex.sh

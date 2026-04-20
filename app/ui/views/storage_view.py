@@ -58,12 +58,12 @@ class StoragePage(BasePage):
             if self.current_path != self.root_path:
                 back_button = ft.ElevatedButton(
                     self._["go_back"],
-                    icon=ft.icons.ARROW_BACK,
+                    icon=ft.Icons.ARROW_BACK,
                     on_click=lambda _: self.app.page.run_task(self.navigate_to_parent)
                 )
                 if self.app.is_mobile:
                     back_item = ft.ListTile(
-                        leading=ft.Icon(ft.icons.ARROW_BACK, color=ft.colors.BLUE),
+                        leading=ft.Icon(ft.Icons.ARROW_BACK, color=ft.Colors.BLUE),
                         title=ft.Text(self._["go_back"]),
                         on_click=lambda _: self.app.page.run_task(self.navigate_to_parent),
                     )
@@ -115,7 +115,7 @@ class StoragePage(BasePage):
         is_mobile = self.app.is_mobile
         for name, is_dir, full_path in items:
             if is_mobile:
-                icon = ft.Icon(ft.icons.FOLDER, color=ft.colors.BLUE) if is_dir else ft.Icon(ft.icons.INSERT_DRIVE_FILE)
+                icon = ft.Icon(ft.Icons.FOLDER, color=ft.Colors.BLUE) if is_dir else ft.Icon(ft.Icons.INSERT_DRIVE_FILE)
                 item = ft.ListTile(
                     leading=icon,
                     title=ft.Text(name),
@@ -146,7 +146,7 @@ class StoragePage(BasePage):
                 content=ft.Container(
                     content=ft.Row(
                         controls=[
-                            ft.Icon(ft.icons.FOLDER_OPEN),
+                            ft.Icon(ft.Icons.FOLDER_OPEN),
                             ft.Text(self._["empty_recording_folder"], size=16, weight=ft.FontWeight.BOLD)
                         ],
                         alignment=ft.MainAxisAlignment.CENTER

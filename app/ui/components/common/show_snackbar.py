@@ -11,7 +11,7 @@ class ShowSnackBar:
 
         message_row = ft.Row(
             controls=[
-                ft.Icon(name=ft.icons.NOTIFICATIONS, color=ft.colors.SURFACE_VARIANT, size=18) if not emoji else
+                ft.Icon(name=ft.Icons.NOTIFICATIONS, color=ft.Colors.ON_SURFACE_VARIANT, size=18) if not emoji else
                 ft.Text(emoji, size=20, no_wrap=False),
                 ft.Text(message, size=14, no_wrap=False),
             ],

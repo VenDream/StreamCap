@@ -1403,7 +1403,7 @@ class SettingsPage(PageBase):
         change_password_button = ft.ElevatedButton(
             text=self._["change_password"],
             on_click=change_password,
-            icon=ft.icons.LOCK_RESET,
+            icon=ft.Icons.LOCK_RESET,
         )
         
         login_required_switch = ft.Switch(
