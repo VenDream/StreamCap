@@ -1,5 +1,8 @@
 import asyncio
+import atexit
 import os
+import subprocess
+import threading
 import time
 
 import flet as ft
@@ -17,6 +20,34 @@ from .ui.views.recordings_view import RecordingsPage
 from .ui.views.settings_view import SettingsPage
 from .ui.views.storage_view import StoragePage
 from .utils.logger import logger
+
+_VIDEO_API_LOCK = threading.Lock()
+_VIDEO_API_PROCESS = None
+
+
+def _stop_video_api_process():
+    global _VIDEO_API_PROCESS
+
+    with _VIDEO_API_LOCK:
+        if not _VIDEO_API_PROCESS:
+            return
+
+        try:
+            if _VIDEO_API_PROCESS.poll() is None:
+                _VIDEO_API_PROCESS.terminate()
+                _VIDEO_API_PROCESS.wait(timeout=5)
+                logger.info("Video API service stopped")
+        except Exception as e:
+            logger.error(f"Error stopping video API service: {e}")
+            try:
+                _VIDEO_API_PROCESS.kill()
+            except Exception:
+                pass
+        finally:
+            _VIDEO_API_PROCESS = None
+
+
+atexit.register(_stop_video_api_process)
 
 
 class App:
@@ -39,6 +70,7 @@ class App:
         self.record_manager = services.recording_manager
 
         self.is_web_mode = False
+        self.is_mobile = False
         self.auth_manager = None
         self.current_username = None
         self.content_area = ft.Column(
@@ -85,6 +117,7 @@ class App:
         if self.record_manager is not None:
             self.page.run_task(self.record_manager.check_free_space)
         self.page.run_task(self._check_for_updates)
+        self.start_video_api_service()
 
         services.register_ui_bridge(self)
 
@@ -166,6 +199,7 @@ class App:
         self._loading_page = True
 
         try:
+            self.page_resize_handler = None
             await self.clear_content_area()
             if page := self.pages.get(page_name):
                 await self.settings.is_changed()
@@ -184,13 +218,39 @@ class App:
     async def cleanup(self):
         self.services.unregister_ui_bridge(self)
 
-        if not self.is_web_mode:
-            try:
+        try:
+            should_stop_video_api = (not self.is_web_mode) or not self.services.snapshot_bridges()
+            if should_stop_video_api:
+                self.stop_video_api_service()
+
+            if not self.is_web_mode:
                 await self.process_manager.cleanup()
-            except ConnectionError:
-                logger.warning("Connection lost, process may have terminated")
+        except ConnectionError:
+            logger.warning("Connection lost, process may have terminated")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+
+    def start_video_api_service(self):
+        global _VIDEO_API_PROCESS
+
+        with _VIDEO_API_LOCK:
+            if _VIDEO_API_PROCESS and _VIDEO_API_PROCESS.poll() is None:
+                return
+
+            try:
+                import sys
+
+                _VIDEO_API_PROCESS = subprocess.Popen(
+                    [sys.executable, "-m", "app.api.video_stream_service"],
+                    cwd=resource_dir,
+                )
+                logger.info(f"Video API service started on port {os.getenv('VIDEO_API_PORT', '6007')}")
             except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
+                logger.error(f"Failed to start video API service: {e}")
+                _VIDEO_API_PROCESS = None
+
+    def stop_video_api_service(self):
+        _stop_video_api_process()
 
     def add_ffmpeg_process(self, process):
         self.process_manager.add_process(process)

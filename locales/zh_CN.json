@@ -188,7 +188,9 @@
     "offline": "未开播",
     "no_monitor": "未监控",
     "checking": "检测中",
-    "live_room": "直播间"
+    "live_room": "直播间",
+    "open_live_room": "打开直播间",
+    "no_live_room_url_tip": "提示：直播间链接无效，无法打开"
   },
   "settings_page": {
     "recording_settings": "录制设置",
@@ -372,7 +374,8 @@
     "platform_max_concurrent_requests": "平台最大并发录制数",
     "platform_max_concurrent_requests_tip": "每个平台允许同时发起请求的最大并发数，默认3",
     "check_live_on_browser_refresh": "刷新网页时检查直播状态",
-    "check_live_on_browser_refresh_tip": "针对web端运行，开启后每次刷新网页都会重复检测直播间状态"
+    "check_live_on_browser_refresh_tip": "针对web端运行，开启后每次刷新网页都会重复检测直播间状态",
+    "custom_push_title_variables_tip": "支持变量: [room_name] [time] [title]"
   },
   "about_page": {
     "about_project": "关于本程序",
@@ -507,5 +510,16 @@
     "input_required": "请输入用户名和密码",
     "login_failed": "用户名或密码错误",
     "login_success": "登录成功"
+  },
+  "stream_player": {
+    "preview_title": "直播预览",
+    "cannot_get_preview_url": "无法获取预览地址",
+    "unsupported_format": "无法识别流格式，仅支持 M3U8 和 FLV 格式",
+    "stream_url_copied": "流地址已复制",
+    "open_live_room": "打开直播间",
+    "copy_stream_url": "复制流地址",
+    "open_in_new_tab": "新标签打开",
+    "embedded_preview_unavailable": "当前环境不支持内嵌预览，已在新标签页打开",
+    "close": "关闭"
   }
 }

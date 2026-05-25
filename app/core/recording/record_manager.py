@@ -67,6 +67,14 @@ class RecordingManager:
             recording.update_title(self._.get(recording.quality, recording.quality))
             recording.showed_checking_status = True
 
+    def render_notification_title(self, template: str | None, streamer_name: str, live_title: str | None, push_at: str):
+        title = (template or "").strip() or self._["status_notify"]
+        return (
+            title.replace("[room_name]", streamer_name)
+            .replace("[time]", push_at)
+            .replace("[title]", live_title or "None")
+        )
+
     async def add_recording(self, recording):
         with GlobalRecordingState.lock:
             GlobalRecordingState.recordings.append(recording)
@@ -274,6 +282,16 @@ class RecordingManager:
             self.services.broadcast_card_update(recording)
             return
 
+        if recording.last_invalid_recording_time:
+            elapsed = (datetime.now() - recording.last_invalid_recording_time).total_seconds()
+            cooldown = recording.invalid_recording_cooldown
+            if elapsed < cooldown:
+                logger.debug(
+                    f"Skip check_if_live: in invalid recording cooldown period "
+                    f"({elapsed:.0f}s < {cooldown}s), url={recording.url}"
+                )
+                return
+
         recording.detection_time = datetime.now().time()
         recording.is_checking = True
 
@@ -334,6 +352,12 @@ class RecordingManager:
         async with semaphore:
             stream_info = await recorder.fetch_stream()
             logger.info(f"Stream Data: {stream_info}")
+
+        if recording.is_recording or recording.rec_id in self.active_recorders:
+            logger.debug(f"Skip stale live check result because recording is already active: {recording.url}")
+            recording.is_checking = False
+            return
+
         if not stream_info or not stream_info.anchor_name:
             logger.error(f"Fetch stream data failed: {recording.url}")
             recording.is_checking = False
@@ -382,8 +406,12 @@ class RecordingManager:
                     .replace("[time]", push_at)
                     .replace("[title]", recording.live_title or "None")
                 )
-                msg_title = user_config.get("custom_notification_title").strip()
-                msg_title = msg_title or self._["status_notify"]
+                msg_title = self.render_notification_title(
+                    user_config.get("custom_notification_title"),
+                    recording.streamer_name,
+                    recording.live_title,
+                    push_at,
+                )
 
                 BackgroundService.get_instance().add_task(msg_manager.push_messages_sync, msg_title, push_content)
                 recording.notified_live_start = True
@@ -406,6 +434,7 @@ class RecordingManager:
 
         else:
             recording.is_recording = False
+            recording.preview_url = None
             if recording.is_live:
                 recording.is_live = False
                 asyncio.create_task(recorder.end_message_push())
@@ -482,10 +511,7 @@ class RecordingManager:
             # If recording, add the current session time.
             total_duration = recording.cumulative_duration + elapsed
             return self._["recorded"] + " " + str(total_duration).split(".")[0]
-        else:
-            # If stopped, show the last recorded total duration.
-            total_duration = recording.last_duration
-            return str(total_duration).split(".")[0]
+        return "0:00:00"
 
     async def delete_recording_cards(self, recordings: list[Recording]):
         self.services.broadcast_card_remove(recordings)

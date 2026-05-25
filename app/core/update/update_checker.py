@@ -254,6 +254,9 @@ class UpdateChecker:
     async def show_update_dialog(self, update_info: dict[str, Any]) -> None:
         _ = self.app.language_manager.language.get("update", {})
 
+        async def open_download(_):
+            await self.open_download_page(update_info)
+
         dialog = ft.AlertDialog(
             title=ft.Text(_["new_version"].format(version=update_info.get("latest_version"))),
             content=ft.Column(
@@ -268,7 +271,7 @@ class UpdateChecker:
             ),
             actions=[
                 ft.TextButton(_["later"], on_click=lambda _: self.close_dialog()),
-                ft.TextButton(_["download"], on_click=lambda _: self.open_download_page(update_info)),
+                ft.TextButton(_["download"], on_click=open_download),
             ],
         )
 
@@ -281,7 +284,7 @@ class UpdateChecker:
             self.app.dialog_area.content.open = False
             self.app.dialog_area.update()
 
-    def open_download_page(self, update_info: dict[str, Any]) -> None:
+    async def open_download_page(self, update_info: dict[str, Any]) -> None:
         import platform
 
         url = update_info.get("download_url", "https://github.com/ihmily/StreamCap/releases/latest")
@@ -296,5 +299,5 @@ class UpdateChecker:
             elif system == "linux" and "linux" in download_urls:
                 url = download_urls["linux"]
 
-        self.app.page.launch_url(url)
+        await self.app.page.launch_url(url, web_popup_window_name=ft.UrlTarget.BLANK)
         self.close_dialog()

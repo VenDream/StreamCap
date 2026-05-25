@@ -1,9 +1,11 @@
 import asyncio
+import glob
 import os
 import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 from datetime import datetime
 from typing import TypeVar
 
@@ -173,12 +175,15 @@ class LiveStreamRecorder:
             self.recording.status_info = RecordingStatus.STOPPED_MONITORING
             display_title = self.recording.display_title
 
+        finished_live_title = self.recording.live_title
         self.recording.live_title = None
+        self.recording.preview_url = None
+        self.recording.speed = ""
         if self.should_stop:
             logger.success(stop_msg or f"Live recording has stopped: {record_name}")
         else:
             logger.success(complete_msg or f"Live recording completed: {record_name}")
-            asyncio.create_task(self.end_message_push())
+            asyncio.create_task(self.end_message_push(finished_live_title))
 
         try:
             self.recording.update({"display_title": display_title})
@@ -214,7 +219,17 @@ class LiveStreamRecorder:
         return url
 
     def set_preview_url(self, stream_info: StreamData):
-        self.recording.preview_url = stream_info.m3u8_url or stream_info.flv_url
+        preview_url = stream_info.m3u8_url or stream_info.flv_url
+        video_api_external_url = os.getenv("VIDEO_API_EXTERNAL_URL", "")
+
+        if video_api_external_url and preview_url:
+            target_scheme = urllib.parse.urlparse(video_api_external_url).scheme
+            if target_scheme == "https" and preview_url.startswith("http://"):
+                preview_url = preview_url.replace("http://", "https://", 1)
+            elif target_scheme == "http" and preview_url.startswith("https://"):
+                preview_url = preview_url.replace("https://", "http://", 1)
+
+        self.recording.preview_url = preview_url
 
     def _get_record_format(self, stream_info: StreamData):
         use_flv_record = ["shopee"]
@@ -337,10 +352,45 @@ class LiveStreamRecorder:
         except Exception as e:
             logger.error(f"Failed to remove recorder instance: {e}")
 
+    async def sync_recording_started(self, record_url: str):
+        self.recording.is_recording = True
+        self.recording.status_info = RecordingStatus.RECORDING
+        self.recording.record_url = record_url
+        self.recording.speed = "0.0 KB/s"
+
+        try:
+            self.services.broadcast_card_update(self.recording)
+            self.services.broadcast_pubsub("update", self.recording)
+        except Exception as e:
+            logger.debug(f"Failed to sync recording started state: {e}")
+
+    @staticmethod
+    def _resolve_current_output_file(save_file_path: str) -> str | None:
+        if "%" not in save_file_path:
+            return save_file_path
+
+        pattern = save_file_path.replace("%03d", "*").replace("%d", "*")
+        files = glob.glob(pattern)
+        if not files:
+            return None
+
+        return max(files, key=os.path.getmtime)
+
     async def recheck_live_status(self):
         if not self.should_stop:
             # not manually stopped
             recording_duration = time.time() - self.recording_start_time
+            if self.recording.last_invalid_recording_time:
+                elapsed = (datetime.now() - self.recording.last_invalid_recording_time).total_seconds()
+                cooldown = self.recording.invalid_recording_cooldown
+                if elapsed < cooldown:
+                    logger.info(
+                        f"Skip recheck_live_status: in invalid recording cooldown period "
+                        f"({elapsed:.0f}s < {cooldown}s), url={self.live_url}"
+                    )
+                    self.recording.status_info = RecordingStatus.MONITORING
+                    return
+
             if recording_duration > self.min_valid_recording_duration:
                 if self.services.recording_enabled and not self.is_flv_preferred_platform:
                     self.services.run_coro(self.services.recording_manager.check_if_live(self.recording))
@@ -394,11 +444,16 @@ class LiveStreamRecorder:
             stderr_task = asyncio.create_task(self._capture_stream_tail(process.stderr))
 
             self.services.process_manager.add_process(process)
-            self.recording.status_info = RecordingStatus.RECORDING
-            self.recording.record_url = record_url
+            await self.sync_recording_started(record_url)
             logger.info(f"Recording in Progress: {live_url}")
             logger.log("STREAM", f"Recording Stream URL: {record_url}")
             self.recording_start_time = time.time()
+            file_has_data = False
+            current_output_file = None
+            last_file_check_time = self.recording_start_time
+            last_file_size = 0
+            speed_samples = []
+            max_samples = 5
 
             while True:
                 if self.should_stop or self.recording.force_stop or not self.services.recording_enabled:
@@ -436,12 +491,47 @@ class LiveStreamRecorder:
                     self.recording.is_recording = False
                     break
 
+                current_time = time.time()
+                time_elapsed = current_time - last_file_check_time
+                if time_elapsed >= 1:
+                    last_file_check_time = current_time
+                    actual_file_path = self._resolve_current_output_file(save_file_path)
+
+                    if actual_file_path and actual_file_path != current_output_file:
+                        current_output_file = actual_file_path
+                        last_file_size = 0
+                        speed_samples.clear()
+
+                    if actual_file_path and os.path.exists(actual_file_path):
+                        file_size = os.path.getsize(actual_file_path)
+                        if file_size >= 1024:
+                            file_has_data = True
+
+                        if last_file_size > 0 and file_size >= last_file_size:
+                            kb_per_second = ((file_size - last_file_size) / time_elapsed) / 1024
+                            speed_samples.append(kb_per_second)
+                            speed_samples = speed_samples[-max_samples:]
+                            average_speed = sum(speed_samples) / len(speed_samples)
+                            self.recording.speed = f"{average_speed:.1f} KB/s"
+                            self.services.broadcast_card_update(self.recording)
+
+                        last_file_size = file_size
+
                 await asyncio.sleep(1)
 
             await process.wait()
             stderr = await stderr_task
             return_code = process.returncode
             safe_return_codes = {0, 255}
+            recording_duration = time.time() - self.recording_start_time
+            self.recording.speed = ""
+
+            if not self.should_stop and recording_duration < self.min_valid_recording_duration and not file_has_data:
+                self.recording.last_invalid_recording_time = datetime.now()
+                logger.warning(
+                    f"Invalid recording detected: duration={recording_duration:.1f}s, "
+                    f"file_has_data={file_has_data}, url={live_url}"
+                )
 
             if return_code not in safe_return_codes:
                 error_output = stderr.decode(errors="replace").strip()
@@ -458,8 +548,7 @@ class LiveStreamRecorder:
                     self.recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
                     self.services.run_coro(self.stop_recording_notify())
 
-                if not self.recording.manually_stopped:
-                    await self.recheck_live_status()
+                await self.recheck_live_status()
 
                 if self.user_config.get("convert_to_mp4") and self.save_format == "ts":
                     if self.segment_record:
@@ -714,8 +803,7 @@ class LiveStreamRecorder:
         try:
             await self.direct_downloader.start_download()
 
-            self.recording.status_info = RecordingStatus.RECORDING
-            self.recording.record_url = record_url
+            await self.sync_recording_started(record_url)
             logger.info(f"Direct Downloading: {live_url}")
             logger.log("STREAM", f"Direct Download Stream URL: {record_url}")
             self.recording_start_time = time.time()
@@ -788,7 +876,7 @@ class LiveStreamRecorder:
                 app_icon=tray_icon_path,
             )
 
-    async def end_message_push(self):
+    async def end_message_push(self, live_title: str | None = None):
         msg_manager = message_pusher.MessagePusher(self.settings)
         user_config = self.settings.user_config
 
@@ -809,10 +897,14 @@ class LiveStreamRecorder:
             push_content = (
                 push_content.replace("[room_name]", self.recording.streamer_name)
                 .replace("[time]", push_at)
-                .replace("[title]", self.recording.live_title or "None")
+                .replace("[title]", live_title or self.recording.live_title or "None")
             )
-            msg_title = user_config.get("custom_notification_title").strip()
-            msg_title = msg_title or self._["status_notify"]
+            msg_title = self.services.recording_manager.render_notification_title(
+                user_config.get("custom_notification_title"),
+                self.recording.streamer_name,
+                live_title or self.recording.live_title,
+                push_at,
+            )
 
             self.services.run_coro(msg_manager.push_messages(msg_title, push_content))
 

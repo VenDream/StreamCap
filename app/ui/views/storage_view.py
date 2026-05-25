@@ -176,15 +176,20 @@ class StoragePage(BasePage):
         video_player = VideoPlayer(self.app)
 
         if self.app.page.web:
-            if not VIDEO_API_EXTERNAL_URL:
-                logger.error("VIDEO_API_EXTERNAL_URL is not set in .env")
-                await self.app.snack_bar.show_snack_bar(self._["video_api_server_not_set"])
-                return
+            video_api_port = os.getenv("VIDEO_API_PORT", "6007")
+            if VIDEO_API_EXTERNAL_URL:
+                base_url = VIDEO_API_EXTERNAL_URL.rstrip("/")
+            elif self.app.page.url:
+                parsed = urllib.parse.urlparse(self.app.page.url)
+                host = parsed.hostname or "localhost"
+                base_url = f"http://{host}:{video_api_port}"
+            else:
+                base_url = f"http://localhost:{video_api_port}"
 
             relative_path = os.path.relpath(file_path, self.root_path)
             filename = urllib.parse.quote(os.path.basename(file_path))
             subfolder = urllib.parse.quote(os.path.dirname(relative_path).replace("\\", "/"))
-            api_url = f"{VIDEO_API_EXTERNAL_URL}/api/videos?filename={filename}&subfolder={subfolder}"
+            api_url = f"{base_url}/api/videos?filename={filename}&subfolder={subfolder}"
             await video_player.preview_video(api_url, is_file_path=False, room_url=room_url)
         else:
             await video_player.preview_video(file_path, is_file_path=True, room_url=room_url)

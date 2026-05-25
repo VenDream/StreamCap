@@ -11,7 +11,7 @@ from ...views.storage_view import StoragePage
 from ..dialogs.card_dialog import CardDialog
 from ..state.recording_card_state import RecordingCardState
 from .recording_dialog import RecordingDialog
-from .video_player import VideoPlayer
+from .stream_player import StreamPlayer
 
 
 class RecordingCardManager:
@@ -100,19 +100,19 @@ class RecordingCardManager:
             weight=RecordingCardState.get_title_weight(recording),
         )
 
-        open_folder_button = ft.IconButton(
-            icon=ft.Icons.FOLDER,
-            icon_color=ft.Colors.PRIMARY,
-            tooltip=self._["open_folder"],
-            on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_dir_button_on_click, e, rec),
-        )
         recording_info_button = ft.IconButton(
             icon=ft.Icons.INFO,
             icon_color=ft.Colors.PRIMARY,
             tooltip=self._["recording_info"],
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_info_button_on_click, e, rec),
         )
-        speed_text_label = ft.Text(speed, size=12)
+        open_live_room_button = ft.IconButton(
+            icon=ft.Icons.OPEN_IN_NEW,
+            icon_color=ft.Colors.PRIMARY,
+            tooltip=self._["open_live_room"],
+            on_click=lambda e, rec=recording: self.app.page.run_task(self.open_live_room_button_on_click, e, rec),
+        )
+        speed_text_label = ft.Text(speed if recording.is_recording else "", size=12)
 
         status_label = self.create_status_label(recording)
 
@@ -123,30 +123,41 @@ class RecordingCardManager:
             tight=True,
         )
 
+        button_row = ft.Row(
+            [
+                record_button,
+                monitor_button,
+                recording_info_button,
+                preview_button,
+                edit_button,
+                delete_button,
+                open_live_room_button,
+            ],
+            spacing=3,
+            alignment=ft.MainAxisAlignment.START,
+            scroll=ft.ScrollMode.HIDDEN,
+        )
+
         card_container = ft.Container(
             content=ft.Column(
                 [
-                    title_row,
-                    duration_text_label,
-                    speed_text_label,
-                    ft.Row(
+                    ft.Column(
                         [
-                            record_button,
-                            open_folder_button,
-                            recording_info_button,
-                            preview_button,
-                            edit_button,
-                            delete_button,
-                            monitor_button,
+                            title_row,
+                            duration_text_label,
+                            speed_text_label,
                         ],
                         spacing=3,
                         alignment=ft.MainAxisAlignment.START,
-                        scroll=ft.ScrollMode.HIDDEN,
+                        tight=True,
                     ),
+                    ft.Container(expand=True),
+                    button_row,
                 ],
                 spacing=3,
-                tight=True,
+                expand=True,
             ),
+            expand=True,
             padding=8,
             on_click=lambda e, rec=recording: self.app.page.run_task(self.recording_card_on_click, e, rec),
             bgcolor=self.get_card_background_color(recording),
@@ -157,11 +168,12 @@ class RecordingCardManager:
 
         return {
             "card": card,
+            "title_row": title_row,
             "display_title_label": display_title_label,
             "duration_label": duration_text_label,
             "speed_label": speed_text_label,
             "record_button": record_button,
-            "open_folder_button": open_folder_button,
+            "open_live_room_button": open_live_room_button,
             "recording_info_button": recording_info_button,
             "edit_button": edit_button,
             "monitor_button": monitor_button,
@@ -206,28 +218,32 @@ class RecordingCardManager:
                     recording_card["display_title_label"].weight = RecordingCardState.get_title_weight(recording)
 
                 new_status_label = self.create_status_label(recording)
+                title_row = recording_card.get("title_row")
+                current_status_label = recording_card.get("status_label")
 
-                if recording_card["card"] and recording_card["card"].content and recording_card["card"].content.content:
-                    title_row = recording_card["card"].content.content.controls[0]
+                if title_row:
                     title_row.alignment = ft.MainAxisAlignment.START
                     title_row.spacing = 5
                     title_row.tight = True
 
-                    # Update the status label if it exists
                     if new_status_label:
-                        if len(title_row.controls) > 1:
-                            title_row.controls[1] = new_status_label
+                        if current_status_label:
+                            current_status_label.content.value = new_status_label.content.value
+                            current_status_label.content.color = new_status_label.content.color
+                            current_status_label.bgcolor = new_status_label.bgcolor
                         else:
                             title_row.controls.append(new_status_label)
+                            recording_card["status_label"] = new_status_label
                     else:
-                        if len(title_row.controls) > 1:
-                            title_row.controls.pop()
+                        if current_status_label and current_status_label in title_row.controls:
+                            title_row.controls.remove(current_status_label)
+                        recording_card["status_label"] = None
 
                 if recording_card.get("duration_label"):
                     recording_card["duration_label"].value = self.app.record_manager.get_duration(recording)
 
                 if recording_card.get("speed_label"):
-                    recording_card["speed_label"].value = recording.speed
+                    recording_card["speed_label"].value = recording.speed if recording.is_recording else ""
 
                 if recording_card.get("record_button"):
                     recording_card["record_button"].icon = self.get_icon_for_recording_state(recording)
@@ -242,11 +258,11 @@ class RecordingCardManager:
                     recording_card["card"].content.border = ft.Border.all(2, self.get_card_border_color(recording))
                     try:
                         self.app.page.update()
-                    except (ft.FletPageDisconnectedException, AssertionError) as e:
+                    except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                         logger.debug(f"Update card failed: {e}")
                         return
 
-            except (ft.FletPageDisconnectedException, AssertionError) as e:
+            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update card failed: {e}")
                 return
             except Exception as e:
@@ -289,9 +305,9 @@ class RecordingCardManager:
             self.app.dialog_area.content = dialog
             try:
                 self.app.page.update()
-            except (ft.FletPageDisconnectedException, AssertionError) as e:
+            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update recording info dialog failed: {e}")
-        except (ft.FletPageDisconnectedException, AssertionError) as e:
+        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
             logger.debug(f"Show recording info dialog failed: {e}")
         except Exception as e:
             logger.debug(f"Show recording info dialog failed: {e}")
@@ -369,10 +385,10 @@ class RecordingCardManager:
 
             try:
                 recordings_page.recording_card_area.update()
-            except (ft.FletPageDisconnectedException, AssertionError) as e:
+            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update recording card area failed: {e}")
 
-        except (ft.FletPageDisconnectedException, AssertionError) as e:
+        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
             logger.debug(f"Remove recording card failed: {e}")
         except Exception as e:
             logger.debug(f"Remove recording card failed: {e}")
@@ -397,6 +413,10 @@ class RecordingCardManager:
     def get_tip_for_monitor_state(self, recording: Recording):
         return self._["stop_monitor"] if recording.monitor_status else self._["start_monitor"]
 
+    @staticmethod
+    def can_update_control(control: ft.Control | None) -> bool:
+        return control is not None and getattr(control, "page", None) is not None
+
     async def update_duration(self, recording: Recording):
         """Update the duration text periodically."""
         while True:
@@ -413,9 +433,11 @@ class RecordingCardManager:
             if recording.is_recording:
                 try:
                     duration_label = self.cards_obj[recording.rec_id]["duration_label"]
+                    if not self.can_update_control(duration_label):
+                        continue
                     duration_label.value = self.app.record_manager.get_duration(recording)
                     duration_label.update()
-                except (ft.FletPageDisconnectedException, AssertionError) as e:
+                except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                     logger.debug(f"Update duration failed: {e}")
                     break
                 except Exception as e:
@@ -433,9 +455,9 @@ class RecordingCardManager:
             self.cards_obj[recording.rec_id]["card"].content.bgcolor = await self.update_record_hover(recording)
             try:
                 self.cards_obj[recording.rec_id]["card"].update()
-            except (ft.FletPageDisconnectedException, AssertionError) as e:
+            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update card click state failed: {e}")
-        except (ft.FletPageDisconnectedException, AssertionError) as e:
+        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
             logger.debug(f"Handle card click event failed: {e}")
         except Exception as e:
             logger.debug(f"Handle card click event failed: {e}")
@@ -472,7 +494,7 @@ class RecordingCardManager:
                 try:
                     delete_alert_dialog.open = False
                     delete_alert_dialog.update()
-                except (ft.FletPageDisconnectedException, AssertionError) as err:
+                except (ft.core.page.PageDisconnectedException, AssertionError) as err:
                     logger.debug(f"Close delete dialog failed: {err}")
 
             delete_alert_dialog = ft.AlertDialog(
@@ -489,17 +511,17 @@ class RecordingCardManager:
             self.app.dialog_area.content = delete_alert_dialog
             try:
                 self.app.page.update()
-            except (ft.FletPageDisconnectedException, AssertionError) as e:
+            except (ft.core.page.PageDisconnectedException, AssertionError) as e:
                 logger.debug(f"Update delete dialog failed: {e}")
-        except (ft.FletPageDisconnectedException, AssertionError) as e:
+        except (ft.core.page.PageDisconnectedException, AssertionError) as e:
             logger.debug(f"Show delete dialog failed: {e}")
         except Exception as e:
             logger.debug(f"Show delete dialog failed: {e}")
 
     async def preview_video_button_on_click(self, _, recording: Recording):
-        if self.app.page.web and recording.record_url:
-            video_player = VideoPlayer(self.app)
-            await video_player.preview_video(recording.preview_url, is_file_path=False, room_url=recording.url)
+        if self.app.page.web and recording.preview_url and (recording.is_live or recording.is_recording):
+            stream_player = StreamPlayer(self.app)
+            await stream_player.preview_stream(recording)
         elif recording.recording_dir and os.path.exists(recording.recording_dir):
             video_files = []
             for root, _, files in os.walk(recording.recording_dir):
@@ -516,6 +538,13 @@ class RecordingCardManager:
                 await self.app.snack_bar.show_snack_bar(self._["no_video_file"])
         else:
             await self.app.snack_bar.show_snack_bar(self._["no_recording_folder"])
+
+    async def open_live_room_button_on_click(self, _, recording: Recording):
+        if recording.url:
+            await self.app.page.launch_url(recording.url, web_popup_window_name=ft.UrlTarget.BLANK)
+            return
+
+        await self.app.snack_bar.show_snack_bar(self._["no_live_room_url_tip"])
 
     async def recording_button_on_click(self, _, recording: Recording):
         await self.on_toggle_recording(recording)

@@ -69,6 +69,8 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
                 except Exception as ex:
                     logger.error(f"close window error: {ex}")
                 finally:
+                    if hasattr(app, "stop_video_api_service"):
+                        app.stop_video_api_service()
                     if not getattr(app, "is_web_mode", False) and hasattr(app, "tray_manager"):
                         app.tray_manager.stop()
                     page.run_task(page.window.destroy)
@@ -77,6 +79,8 @@ async def handle_app_close(page: ft.Page, app, save_progress_overlay) -> None:
 
             threading.Thread(target=close_app, daemon=True).start()
         else:
+            if hasattr(app, "stop_video_api_service"):
+                app.stop_video_api_service()
             if not getattr(app, "is_web_mode", False) and hasattr(app, "tray_manager"):
                 app.tray_manager.stop()
             await _safe_destroy_window(page)

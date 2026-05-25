@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import sys
@@ -11,7 +12,7 @@ import aiofiles
 from cachetools import TTLCache
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.runtime.paths import default_recordings_dir
@@ -61,6 +62,161 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/api/player", response_class=HTMLResponse)
+async def stream_player(
+    stream_url: str = Query(...),
+    stream_type: str = Query(..., pattern="^(m3u8|flv)$"),
+):
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Stream Preview</title>
+  <style>
+    html, body {{
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }}
+    #player {{
+      width: 100%;
+      height: 100%;
+      background: #000;
+      object-fit: contain;
+    }}
+    #error {{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.82);
+      text-align: center;
+      line-height: 1.5;
+      font-size: 14px;
+    }}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+</head>
+<body>
+  <video
+    id="player"
+    controls
+    autoplay
+    playsinline
+    webkit-playsinline="true"
+    x5-playsinline="true"
+    x5-video-player-type="h5"
+    x5-video-player-fullscreen="true"
+  ></video>
+  <div id="error"></div>
+  <script>
+    const streamUrl = {json.dumps(stream_url)};
+    const streamType = {json.dumps(stream_type)};
+    const video = document.getElementById("player");
+    const errorBox = document.getElementById("error");
+    let playerInstance = null;
+
+    function showError(message) {{
+      errorBox.textContent = message;
+      errorBox.style.display = "flex";
+    }}
+
+    async function tryPlay() {{
+      try {{
+        await video.play();
+      }} catch (_error) {{
+        video.muted = true;
+        try {{
+          await video.play();
+        }} catch (_mutedError) {{
+          showError("Autoplay blocked. Tap play to continue.");
+        }}
+      }}
+    }}
+
+    function destroyPlayer() {{
+      try {{
+        if (playerInstance && typeof playerInstance.destroy === "function") {{
+          playerInstance.destroy();
+        }}
+      }} catch (_error) {{
+        // Ignore cleanup errors in the embedded player page.
+      }}
+    }}
+
+    async function initPlayer() {{
+      if (streamType === "m3u8") {{
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+          video.src = streamUrl;
+          await tryPlay();
+          return;
+        }}
+
+        if (window.Hls && window.Hls.isSupported()) {{
+          playerInstance = new Hls({{
+            enableWorker: true,
+            lowLatencyMode: true,
+          }});
+          playerInstance.loadSource(streamUrl);
+          playerInstance.attachMedia(video);
+          playerInstance.on(Hls.Events.MANIFEST_PARSED, tryPlay);
+          playerInstance.on(Hls.Events.ERROR, (_event, data) => {{
+            if (data && data.fatal) {{
+              showError("HLS playback failed.");
+            }}
+          }});
+          return;
+        }}
+
+        showError("This browser does not support HLS playback.");
+        return;
+      }}
+
+      if (streamType === "flv") {{
+        if (window.flvjs && window.flvjs.isSupported()) {{
+          playerInstance = flvjs.createPlayer({{
+            type: "flv",
+            url: streamUrl,
+            isLive: true,
+          }});
+          playerInstance.attachMediaElement(video);
+          playerInstance.load();
+          try {{
+            await playerInstance.play();
+          }} catch (_error) {{
+            video.muted = true;
+            try {{
+              await playerInstance.play();
+            }} catch (_mutedError) {{
+              showError("FLV autoplay blocked. Tap play to continue.");
+            }}
+          }}
+          return;
+        }}
+
+        showError("This browser does not support FLV playback.");
+        return;
+      }}
+
+      showError("Unsupported stream type.");
+    }}
+
+    window.addEventListener("beforeunload", destroyPlayer);
+    initPlayer();
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @app.get("/api/videos")

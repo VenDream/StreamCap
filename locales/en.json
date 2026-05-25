@@ -188,7 +188,9 @@
     "offline": "Offline",
     "no_monitor": "Not Monitored",
     "checking": "Checking",
-    "live_room": "Live Room"
+    "live_room": "Live Room",
+    "open_live_room": "Open Live Room",
+    "no_live_room_url_tip": "Tip: Invalid live room URL, cannot open"
   },
   "settings_page": {
     "recording_settings": "Recording Settings",
@@ -372,7 +374,8 @@
     "platform_max_concurrent_requests": "Max concurrent recordings per platform",
     "platform_max_concurrent_requests_tip": "The maximum number of concurrent requests allowed per platform. Default is 3.",
     "check_live_on_browser_refresh": "Check live status when refreshing the web",
-    "check_live_on_browser_refresh_tip": "Check live status when refreshing the web"
+    "check_live_on_browser_refresh_tip": "Check live status when refreshing the web",
+    "custom_push_title_variables_tip": "Supported variables: [room_name] [time] [title]"
   },
   "about_page": {
     "about_project": "About This Application",
@@ -507,5 +510,16 @@
     "input_required": "Please enter username and password",
     "login_failed": "Username or password is incorrect",
     "login_success": "Login successful"
+  },
+  "stream_player": {
+    "preview_title": "Live Preview",
+    "cannot_get_preview_url": "Cannot get preview URL",
+    "unsupported_format": "Unsupported format, only M3U8 and FLV are supported",
+    "stream_url_copied": "Stream URL copied",
+    "open_live_room": "Open Live Room",
+    "copy_stream_url": "Copy Stream URL",
+    "open_in_new_tab": "Open in New Tab",
+    "embedded_preview_unavailable": "Embedded preview is unavailable in this environment. Opened in a new tab.",
+    "close": "Close"
   }
 }

@@ -594,6 +594,7 @@ class SettingsPage(PageBase):
                             ft.TextField(
                                 value=self.get_config_value("custom_notification_title"),
                                 width=300,
+                                helper=self._["custom_push_title_variables_tip"],
                                 data="custom_notification_title",
                                 on_change=self.on_change,
                             ),
