@@ -58,7 +58,7 @@ class LiveStreamRecorderTests(unittest.TestCase):
                 recorder = LiveStreamRecorder(services, recording, recording_info)
                 recorder.set_preview_url(stream_info)
 
-            self.assertEqual(recording.preview_url, "https://example.com/live.m3u8")
+            assert recording.preview_url == "https://example.com/live.m3u8"
 
 
 if __name__ == "__main__":
