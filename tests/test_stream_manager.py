@@ -1,0 +1,65 @@
+import tempfile
+import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+from app.core.recording.stream_manager import LiveStreamRecorder
+
+
+class StubLanguageManager:
+    def __init__(self):
+        self.language = {
+            "recording_manager": {"live_room": "Live Room", "status_notify": "Status Notify"},
+            "stream_manager": {},
+        }
+
+    def add_observer(self, *_args, **_kwargs):
+        return None
+
+
+class StubServices:
+    def __init__(self, output_dir):
+        self.settings_config = SimpleNamespace(
+            user_config={},
+            accounts_config={},
+            cookies_config={},
+        )
+        self.language_manager = StubLanguageManager()
+        self.subprocess_start_up_info = None
+        self.recording_manager = SimpleNamespace()
+        self.run_coro = AsyncMock()
+        self.snapshot_bridges = lambda: []
+        self.process_manager = SimpleNamespace(add_process=lambda *_args, **_kwargs: None)
+        self.output_dir = output_dir
+
+
+class LiveStreamRecorderTests(unittest.TestCase):
+    def test_set_preview_url_uses_video_api_external_scheme_in_services_mode(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                streamer_name="主播",
+                preview_url=None,
+                flv_use_direct_download=False,
+                recording_dir=None,
+            )
+            recording_info = {
+                "platform": "bilibili",
+                "platform_key": "bilibili",
+                "live_url": "https://example.com/room",
+                "output_dir": output_dir,
+                "quality": "source",
+                "save_format": "mp4",
+                "segment_record": False,
+            }
+            stream_info = SimpleNamespace(m3u8_url="http://example.com/live.m3u8", flv_url=None)
+
+            with patch.dict("os.environ", {"VIDEO_API_EXTERNAL_URL": "https://proxy.example.com"}):
+                recorder = LiveStreamRecorder(services, recording, recording_info)
+                recorder.set_preview_url(stream_info)
+
+            self.assertEqual(recording.preview_url, "https://example.com/live.m3u8")
+
+
+if __name__ == "__main__":
+    unittest.main()
