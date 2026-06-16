@@ -177,3 +177,9 @@ backup_config/
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe
+
+# AI agents
+.codex
+.claude
+codex.sh
+claude.sh
