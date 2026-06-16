@@ -112,12 +112,12 @@ class AppInitializationTests(unittest.TestCase):
         ):
             app = App(page, services=services)
 
-        self.assertIs(app.record_manager, services.recording_manager)
-        self.assertIs(services.registered_bridge, app)
-        self.assertFalse(app.is_mobile)
-        self.assertEqual(services.settings_config.language_code, "zh_CN")
-        self.assertEqual(services.settings_config.cookies_config, {"bilibili": "cookie"})
-        self.assertEqual(services.settings_config.accounts_config, {"douyin": {"username": "tester"}})
+        assert app.record_manager is services.recording_manager
+        assert services.registered_bridge is app
+        assert app.is_mobile is False
+        assert services.settings_config.language_code == "zh_CN"
+        assert services.settings_config.cookies_config == {"bilibili": "cookie"}
+        assert services.settings_config.accounts_config == {"douyin": {"username": "tester"}}
         start_video_api_service.assert_called_once_with()
 
 
