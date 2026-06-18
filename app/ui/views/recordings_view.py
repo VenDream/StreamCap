@@ -15,9 +15,9 @@ from ..filters import RecordingFilters
 
 
 class RecordingsPage(PageBase):
-    CARD_MIN_WIDTH = 320
+    CARD_MIN_WIDTH = 360
     MOBILE_CARD_MIN_WIDTH = 250
-    CARD_ASPECT_RATIO = 2.55
+    CARD_ASPECT_RATIO = 2.45
     MOBILE_CARD_ASPECT_RATIO = 2.3
 
     def __init__(self, app):
