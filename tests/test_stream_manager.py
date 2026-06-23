@@ -60,6 +60,35 @@ class LiveStreamRecorderTests(unittest.TestCase):
 
             assert recording.preview_url == "https://example.com/live.m3u8"
 
+    def test_set_preview_url_prefers_huya_record_url(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                streamer_name="主播",
+                preview_url=None,
+                flv_use_direct_download=False,
+                recording_dir=None,
+            )
+            recording_info = {
+                "platform": "huya",
+                "platform_key": "huya",
+                "live_url": "https://www.huya.com/136829",
+                "output_dir": output_dir,
+                "quality": "source",
+                "save_format": "mp4",
+                "segment_record": False,
+            }
+            stream_info = SimpleNamespace(
+                m3u8_url="http://tx.hls.huya.com/live.m3u8?token=abc",
+                flv_url="http://tx.flv.huya.com/live.flv?token=abc",
+                record_url="http://tx.flv.huya.com/live.flv?token=abc",
+            )
+
+            recorder = LiveStreamRecorder(services, recording, recording_info)
+            recorder.set_preview_url(stream_info)
+
+            assert recording.preview_url == "http://tx.flv.huya.com/live.flv?token=abc"
+
 
 if __name__ == "__main__":
     unittest.main()
