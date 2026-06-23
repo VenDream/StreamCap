@@ -8,6 +8,9 @@ from ....utils.logger import logger
 
 
 class StreamPlayer:
+    SUPPORTED_WEBVIEW_PLATFORMS = {"android", "ios", "macos"}
+    LOCAL_VIDEO_API_HOSTS = {"localhost", "0.0.0.0", "::", "::1"}
+
     def __init__(self, app):
         self.app = app
         self._ = {}
@@ -37,6 +40,8 @@ class StreamPlayer:
         if page_url:
             parsed = urllib.parse.urlparse(page_url)
             host = parsed.hostname or "localhost"
+            if host in self.LOCAL_VIDEO_API_HOSTS:
+                host = "127.0.0.1"
             return f"http://{host}:{video_api_port}"
 
         return f"http://localhost:{video_api_port}"
@@ -45,9 +50,29 @@ class StreamPlayer:
         encoded_stream_url = urllib.parse.quote(stream_url, safe="")
         return f"{self._build_player_base_url()}/api/player?stream_url={encoded_stream_url}&stream_type={stream_type}"
 
+    def _is_embedded_webview_supported(self) -> bool:
+        page = getattr(self.app, "page", None)
+        if getattr(page, "web", False):
+            return True
+
+        platform = getattr(page, "platform", None)
+        platform_value = getattr(platform, "value", platform)
+        return platform_value in self.SUPPORTED_WEBVIEW_PLATFORMS
+
     @staticmethod
-    def _create_webview_control(player_url: str):
-        webview_cls = getattr(ft, "WebView", None)
+    def _get_webview_class():
+        try:
+            from flet_webview import WebView
+
+            return WebView
+        except ImportError:
+            return getattr(ft, "WebView", None)
+
+    def _create_webview_control(self, player_url: str):
+        if not self._is_embedded_webview_supported():
+            return None
+
+        webview_cls = self._get_webview_class()
         if webview_cls is None:
             return None
 
@@ -81,7 +106,7 @@ class StreamPlayer:
             self.app.dialog_area.update()
 
         async def copy_stream_url(_):
-            self.app.page.set_clipboard(stream_url)
+            await ft.Clipboard().set(stream_url)
             await self.app.snack_bar.show_snack_bar(self._["stream_url_copied"])
 
         async def open_in_new_tab(_):
