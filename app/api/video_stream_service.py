@@ -39,6 +39,11 @@ VIDEO_DIR = Path(CUSTOM_VIDEO_ROOT_DIR or DEFAULT_VIDEO_ROOT_DIR)
 os.makedirs(VIDEO_DIR, exist_ok=True)
 
 VIDEO_META_CACHE = TTLCache(maxsize=50, ttl=300)
+PLAYER_EMBED_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Cross-Origin-Embedder-Policy": "require-corp",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+}
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -216,7 +221,7 @@ async def stream_player(
   </script>
 </body>
 </html>"""
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html, headers=PLAYER_EMBED_HEADERS)
 
 
 @app.get("/api/videos")
