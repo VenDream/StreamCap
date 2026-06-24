@@ -94,6 +94,11 @@ class StreamPlayer:
             return
 
         player_url = self._build_player_url(stream_url, stream_type)
+
+        if self.app.page.web and self.app.is_mobile:
+            await self.app.page.launch_url(player_url, web_popup_window_name=ft.UrlTarget.BLANK)
+            return
+
         webview = self._create_webview_control(player_url)
 
         if webview is None:
