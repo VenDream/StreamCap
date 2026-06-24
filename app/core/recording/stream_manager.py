@@ -222,7 +222,7 @@ class LiveStreamRecorder:
         if self.platform_key == "huya":
             preview_url = stream_info.record_url or stream_info.flv_url or stream_info.m3u8_url
         else:
-            preview_url = stream_info.m3u8_url or stream_info.flv_url
+            preview_url = stream_info.m3u8_url or stream_info.flv_url or stream_info.record_url
 
         video_api_external_url = os.getenv("VIDEO_API_EXTERNAL_URL", "")
 

@@ -89,6 +89,36 @@ class LiveStreamRecorderTests(unittest.TestCase):
 
             assert recording.preview_url == "http://tx.flv.huya.com/live.flv?token=abc"
 
+    def test_set_preview_url_falls_back_to_record_url_when_bilibili_has_no_hls_or_flv(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                streamer_name="主播",
+                preview_url=None,
+                flv_use_direct_download=False,
+                recording_dir=None,
+            )
+            recording_info = {
+                "platform": "bilibili",
+                "platform_key": "bilibili",
+                "live_url": "https://live.bilibili.com/5472071",
+                "output_dir": output_dir,
+                "quality": "source",
+                "save_format": "mp4",
+                "segment_record": False,
+            }
+            stream_info = SimpleNamespace(
+                m3u8_url=None,
+                flv_url=None,
+                record_url="http://example.com/live.flv?token=abc",
+            )
+
+            with patch.dict("os.environ", {"VIDEO_API_EXTERNAL_URL": "https://proxy.example.com"}):
+                recorder = LiveStreamRecorder(services, recording, recording_info)
+                recorder.set_preview_url(stream_info)
+
+            assert recording.preview_url == "https://example.com/live.flv?token=abc"
+
 
 if __name__ == "__main__":
     unittest.main()
