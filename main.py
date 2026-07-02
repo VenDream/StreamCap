@@ -124,8 +124,11 @@ def handle_disconnect(page: ft.Page, app: App) -> Callable:
 def handle_page_resize(page: ft.Page, app: App) -> Callable:
     """handle page resize"""
 
-    def on_resize(_: ft.ControlEvent) -> None:
+    def on_resize(e: ft.ControlEvent) -> None:
         setup_responsive_layout(page, app)
+        resize_handler = getattr(app, "page_resize_handler", None)
+        if resize_handler is not None:
+            page.run_task(resize_handler, e)
         page.update()
 
     return on_resize
