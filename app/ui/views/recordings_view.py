@@ -76,7 +76,7 @@ class RecordingsPage(PageBase):
             await self.recalculate_grid_columns()
 
         self.page.on_keyboard_event = self.on_keyboard
-        self.page.on_resize = self.update_grid_layout
+        self.app.page_resize_handler = self.update_grid_layout
 
     def pubsub_subscribe(self):
         self.app.page.pubsub.subscribe_topic("add", self.subscribe_add_cards)

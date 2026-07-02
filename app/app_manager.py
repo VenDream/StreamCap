@@ -111,6 +111,7 @@ class App:
         self.record_card_manager = RecordingCardManager(self)
         self.current_page = None
         self._loading_page = False
+        self.page_resize_handler = None
         self.install_manager = InstallationManager(self)
         self.update_checker = UpdateChecker(self)
         self.page.run_task(self.install_manager.check_env)
