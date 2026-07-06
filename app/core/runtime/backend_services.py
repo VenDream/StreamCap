@@ -126,7 +126,6 @@ class BackendServices:
         return self._backend_loop
 
     def run_coro(self, coro):
-
         if coro is None:
             return None
 

@@ -118,6 +118,9 @@ class SettingsPage(PageBase):
         select_language = self.user_config.get("language")
         self.language_code = self.language_option.get(select_language, default_language_code)
         self.app.language_code = self.language_code
+        settings_config = getattr(getattr(self.app, "services", None), "settings_config", None)
+        if settings_config is not None:
+            settings_config.language_code = self.language_code
 
     def get_config_value(self, key, default=None):
         return self.user_config.get(key, self.default_config.get(key, default))
@@ -136,6 +139,9 @@ class SettingsPage(PageBase):
             ui_language = self.user_config["language"]
             self.user_config = self.default_config.copy()
             self.user_config["language"] = ui_language
+            settings_config = getattr(getattr(self.app, "services", None), "settings_config", None)
+            if settings_config is not None:
+                settings_config.adopt_user_config(self.user_config)
             self.app.language_manager.notify_observers()
             self.page.run_task(self.load)
             await self.config_manager.save_user_config(self.user_config)

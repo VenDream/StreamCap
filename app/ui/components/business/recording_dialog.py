@@ -367,7 +367,6 @@ class RecordingDialog:
             return existing_recordings
 
         async def on_confirm(e):
-
             existing_recordings = get_existing_recordings()
 
             if tabs.selected_index == 0:

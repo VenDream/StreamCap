@@ -424,7 +424,6 @@ class RecordingsPage(PageBase):
         )
 
     async def add_record_cards(self):
-
         self.loading_indicator.visible = True
         self.loading_indicator.update()
 
@@ -563,7 +562,6 @@ class RecordingsPage(PageBase):
         await self.add_recording_dialog.show_dialog()
 
     async def refresh_cards_on_click(self, _e):
-
         self.loading_indicator.visible = True
         self.loading_indicator.update()
 
@@ -610,7 +608,6 @@ class RecordingsPage(PageBase):
         tips = self._["batch_delete_confirm_tip"] if selected_recordings else self._["clear_all_confirm_tip"]
 
         async def confirm_dlg(_):
-
             if selected_recordings:
                 await self.app.record_manager.stop_monitor_recordings(selected_recordings)
                 await self.app.record_manager.delete_recording_cards(selected_recordings)

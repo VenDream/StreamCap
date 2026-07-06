@@ -207,7 +207,6 @@ class LiveStreamRecorder:
         return stream_info.record_url
 
     def _get_record_url(self, stream_info: StreamData):
-
         url = self._select_source_url(stream_info)
 
         http_record_list = ["shopee", "migu"]

@@ -226,7 +226,6 @@ async def stream_player(
 
 @app.get("/api/videos")
 async def get_video(request: Request, filename: str = Query(...), subfolder: str | None = None):
-
     cache_key = f"{filename}-{subfolder}"
     if meta := VIDEO_META_CACHE.get(cache_key):
         if_none_match = request.headers.get("If-None-Match")
