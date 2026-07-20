@@ -179,7 +179,13 @@ ffplay.exe
 ffprobe.exe
 
 # AI agents
+.agent
+.agents
+.trellis
 .codex
 .claude
+.opencode
+grok.sh
 codex.sh
 claude.sh
+opencode.sh
