@@ -1,3 +1,4 @@
+import asyncio
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -118,6 +119,18 @@ class LiveStreamRecorderTests(unittest.TestCase):
                 recorder.set_preview_url(stream_info)
 
             assert recording.preview_url == "https://example.com/live.flv?token=abc"
+
+
+class StreamTailCaptureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_capture_stream_tail_drains_stream_and_keeps_bounded_tail(self):
+        stream = asyncio.StreamReader()
+        payload = b"a" * 5000 + b"stderr-tail"
+        stream.feed_data(payload)
+        stream.feed_eof()
+
+        result = await LiveStreamRecorder._capture_stream_tail(stream, max_bytes=1024)
+
+        assert result == payload[-1024:]
 
 
 if __name__ == "__main__":

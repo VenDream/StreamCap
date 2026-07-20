@@ -210,7 +210,6 @@ class NotificationService:
         channel: int = 9,
         tags: str = "partying_face",
     ) -> dict[str, Any]:
-
         results = {"success": [], "error": []}
         sendkey_list = sendkey.replace("，", ",").split(",") if sendkey.strip() else []
 
