@@ -28,10 +28,28 @@ class StubServices:
         self.language_manager = StubLanguageManager()
         self.subprocess_start_up_info = None
         self.recording_manager = SimpleNamespace()
+        self.recording_enabled = True
         self.run_coro = AsyncMock()
         self.snapshot_bridges = lambda: []
         self.process_manager = SimpleNamespace(add_process=lambda *_args, **_kwargs: None)
+        self.broadcast_card_update = lambda *_args, **_kwargs: None
+        self.broadcast_pubsub = lambda *_args, **_kwargs: None
+        self.broadcast_snack = lambda *_args, **_kwargs: None
         self.output_dir = output_dir
+
+
+class StubProcess:
+    def __init__(self):
+        self.returncode = None
+        self.stdin = None
+        self.stderr = asyncio.StreamReader()
+        self.stderr.feed_eof()
+
+    def kill(self):
+        self.returncode = -9
+
+    async def wait(self):
+        return self.returncode
 
 
 class LiveStreamRecorderTests(unittest.TestCase):
@@ -131,6 +149,118 @@ class StreamTailCaptureTests(unittest.IsolatedAsyncioTestCase):
         result = await LiveStreamRecorder._capture_stream_tail(stream, max_bytes=1024)
 
         assert result == payload[-1024:]
+
+
+class RecordingLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_start_ffmpeg_releases_active_recorder_when_loop_raises(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                rec_id="douyu-repro",
+                is_recording=False,
+                force_stop=False,
+                status_info=None,
+                record_url=None,
+                speed="",
+            )
+            active_recorders = {}
+
+            def stop_recording(current_recording):
+                current_recording.is_recording = False
+
+            services.recording_manager = SimpleNamespace(
+                active_recorders=active_recorders,
+                stop_recording=stop_recording,
+            )
+
+            recorder = LiveStreamRecorder.__new__(LiveStreamRecorder)
+            recorder.services = services
+            recorder.recording = recording
+            recorder.subprocess_start_info = None
+            recorder.should_stop = False
+            recorder._ = {"no_ffmpeg_tip": "FFmpeg error"}
+            active_recorders[recording.rec_id] = recorder
+
+            process = StubProcess()
+            with (
+                patch(
+                    "app.core.recording.stream_manager.asyncio.create_subprocess_exec",
+                    new=AsyncMock(return_value=process),
+                ),
+                patch.object(
+                    LiveStreamRecorder,
+                    "_resolve_current_output_file",
+                    side_effect=OSError("injected file probe failure"),
+                ),
+            ):
+                result = await recorder.start_ffmpeg(
+                    "Douyu repro",
+                    "https://www.douyu.com/repro",
+                    "https://example.invalid/live.flv",
+                    ["ffmpeg", "/tmp/douyu-repro.ts"],
+                    "ts",
+                )
+
+            assert result is False
+            assert recording.is_recording is False
+            assert recording.speed == ""
+            assert recording.record_url is None
+            assert recording.rec_id not in active_recorders
+
+    async def test_stale_recorder_cleanup_does_not_clear_new_recording_state(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                rec_id="douyu-repro",
+                is_recording=True,
+                record_url="https://example.invalid/new-live.flv",
+                speed="512.0 KB/s",
+            )
+            recorder = LiveStreamRecorder.__new__(LiveStreamRecorder)
+            recorder.services = services
+            recorder.recording = recording
+            recorder._runtime_state_released = False
+            new_recorder = object()
+            services.recording_manager = SimpleNamespace(
+                active_recorders={recording.rec_id: new_recorder},
+            )
+
+            cleaned = await recorder._cleanup_recording_runtime_state()
+
+            assert cleaned is False
+            assert services.recording_manager.active_recorders[recording.rec_id] is new_recorder
+            assert recording.is_recording is True
+            assert recording.record_url == "https://example.invalid/new-live.flv"
+            assert recording.speed == "512.0 KB/s"
+
+    async def test_recording_runtime_cleanup_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            services = StubServices(output_dir)
+            recording = SimpleNamespace(
+                rec_id="douyu-repro",
+                is_recording=True,
+                force_stop=True,
+                record_url="https://example.invalid/live.flv",
+                speed="512.0 KB/s",
+            )
+            recorder = LiveStreamRecorder.__new__(LiveStreamRecorder)
+            recorder.services = services
+            recorder.recording = recording
+            recorder._runtime_state_released = False
+            services.recording_manager = SimpleNamespace(
+                active_recorders={recording.rec_id: recorder},
+            )
+
+            first_cleanup = await recorder._cleanup_recording_runtime_state()
+            second_cleanup = await recorder._cleanup_recording_runtime_state()
+
+            assert first_cleanup is True
+            assert second_cleanup is False
+            assert recording.rec_id not in services.recording_manager.active_recorders
+            assert recording.is_recording is False
+            assert recording.force_stop is False
+            assert recording.record_url is None
+            assert recording.speed == ""
 
 
 if __name__ == "__main__":
