@@ -97,7 +97,7 @@ class App:
 
         self.snack_bar_area = ft.Container()
         self.dialog_area = ft.Container()
-        self.complete_page = ft.Row(
+        desktop_layout = ft.Row(
             expand=True,
             controls=[
                 self.left_navigation_menu,
@@ -107,6 +107,7 @@ class App:
                 self.snack_bar_area,
             ],
         )
+        self.complete_page = ft.Container(content=desktop_layout, expand=True)
         self.snack_bar = ShowSnackBar(self)
         self.subprocess_start_up_info = services.subprocess_start_up_info
         self.shutdown_manager = ScheduledShutdownManager(self)

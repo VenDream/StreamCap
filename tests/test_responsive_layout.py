@@ -2,7 +2,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.ui.layout.responsive_layout import is_mobile_device
+import flet as ft
+
+from app.ui.layout.responsive_layout import is_mobile_device, setup_responsive_layout
 from app.ui.views.recordings_view import RecordingsPage
 from main import handle_page_resize
 
@@ -24,11 +26,11 @@ class ResponsiveLayoutTests(unittest.IsolatedAsyncioTestCase):
         app = SimpleNamespace(page_resize_handler=resize_handler)
         event = SimpleNamespace()
 
-        with patch("main.setup_responsive_layout") as setup_responsive_layout:
+        with patch("main.setup_responsive_layout") as responsive_layout:
             on_resize = handle_page_resize(page, app)
             on_resize(event)
 
-        setup_responsive_layout.assert_called_once_with(page, app)
+        responsive_layout.assert_called_once_with(page, app)
         page.run_task.assert_called_once_with(resize_handler, event)
         page.update.assert_called_once_with()
 
@@ -63,6 +65,44 @@ class ResponsiveLayoutTests(unittest.IsolatedAsyncioTestCase):
 
         assert page.on_resize is original_resize_handler
         assert app.page_resize_handler is recordings_page.update_grid_layout
+
+    def test_layout_switch_keeps_mounted_root_control(self):
+        page = SimpleNamespace(width=500, window=SimpleNamespace(width=500), go=lambda *_args: None)
+        root = ft.Container(expand=True)
+        navigation = ft.Container(width=192, visible=True)
+        app = SimpleNamespace(
+            language_manager=SimpleNamespace(
+                language={
+                    "sidebar": {
+                        "home": "Home",
+                        "recordings": "Recordings",
+                        "settings": "Settings",
+                        "storage": "Storage",
+                        "about": "About",
+                    }
+                }
+            ),
+            left_navigation_menu=navigation,
+            content_area=ft.Column(),
+            dialog_area=ft.Container(),
+            snack_bar_area=ft.Container(),
+            complete_page=root,
+            is_mobile=False,
+        )
+
+        setup_responsive_layout(page, app)
+
+        assert app.complete_page is root
+        assert isinstance(root.content, ft.Column)
+        assert navigation.visible is False
+
+        page.width = 1200
+        setup_responsive_layout(page, app)
+
+        assert app.complete_page is root
+        assert isinstance(root.content, ft.Row)
+        assert navigation.visible is True
+        assert navigation.width == 192
 
 
 if __name__ == "__main__":
