@@ -209,6 +209,8 @@ class LiveStreamRecorder:
 
     def _get_record_url(self, stream_info: StreamData):
         url = self._select_source_url(stream_info)
+        if not url:
+            return None
 
         http_record_list = ["shopee", "migu"]
         if self.user_config.get("force_https_recording") and url.startswith("http://"):

@@ -360,6 +360,17 @@ class RecordingManager:
                 self.services.broadcast_card_update(recording)
                 self.services.broadcast_pubsub("update", recording)
             return
+
+        if stream_info.is_live and not recording.only_notify_no_record and not recorder._get_record_url(stream_info):
+            logger.warning(f"Live stream has no recordable URL, retry on next check: {recording.url}")
+            recording.is_live = False
+            recording.is_recording = False
+            recording.is_checking = False
+            recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
+            self.services.broadcast_card_update(recording)
+            self.services.broadcast_pubsub("update", recording)
+            return
+
         if self.settings.user_config.get("remove_emojis"):
             stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, self._["live_room"])
 
