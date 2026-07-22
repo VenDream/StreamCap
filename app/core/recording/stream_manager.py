@@ -53,6 +53,7 @@ class LiveStreamRecorder:
         self.direct_downloader = None
         self.min_valid_recording_duration = 25
         self.recording_start_time = 0
+        self._runtime_state_released = False
         os.makedirs(self.output_dir, exist_ok=True)
         self.services.language_manager.add_observer(self)
         self._ = {}
@@ -349,13 +350,43 @@ class LiveStreamRecorder:
                 )
             )
 
-    async def remove_active_recorder(self):
+    async def remove_active_recorder(self) -> bool:
         try:
-            if self.recording.rec_id in self.services.recording_manager.active_recorders:
-                del self.services.recording_manager.active_recorders[self.recording.rec_id]
+            active_recorders = self.services.recording_manager.active_recorders
+            active_recorder = active_recorders.get(self.recording.rec_id)
+            if active_recorder is self:
+                del active_recorders[self.recording.rec_id]
                 logger.info(f"Removed recorder from active_recorders: {self.recording.rec_id}")
+                return True
+            if active_recorder is not None:
+                logger.debug(
+                    f"Skip removing recorder because a newer instance is active: "
+                    f"{self.recording.rec_id}, current_id={id(active_recorder)}, old_id={id(self)}"
+                )
         except Exception as e:
             logger.error(f"Failed to remove recorder instance: {e}")
+        return False
+
+    async def _cleanup_recording_runtime_state(self) -> bool:
+        if self._runtime_state_released:
+            return False
+
+        active_recorder = self.services.recording_manager.active_recorders.get(self.recording.rec_id)
+        if active_recorder is not None and active_recorder is not self:
+            logger.debug(
+                f"Skip stale recorder cleanup because a newer instance is active: "
+                f"{self.recording.rec_id}, current_id={id(active_recorder)}, old_id={id(self)}"
+            )
+            self._runtime_state_released = True
+            return False
+
+        await self.remove_active_recorder()
+        self.recording.is_recording = False
+        self.recording.force_stop = False
+        self.recording.speed = ""
+        self.recording.record_url = None
+        self._runtime_state_released = True
+        return True
 
     async def sync_recording_started(self, record_url: str):
         self.recording.is_recording = True
@@ -433,6 +464,7 @@ class LiveStreamRecorder:
 
         logger.info(f"Starting ffmpeg recording - recorder id: {id(self)}, rec_id: {self.recording.rec_id}")
         self.should_stop = False
+        self._runtime_state_released = False
         process = None
         stderr_task = None
 
@@ -463,8 +495,7 @@ class LiveStreamRecorder:
             while True:
                 if self.should_stop or self.recording.force_stop or not self.services.recording_enabled:
                     logger.info(f"Preparing to End Recording: {live_url}")
-                    await self.remove_active_recorder()
-                    self.recording.is_recording = False
+                    await self._cleanup_recording_runtime_state()
                     try:
                         if os.name == "nt":
                             if process.stdin:
@@ -487,13 +518,11 @@ class LiveStreamRecorder:
                         process.kill()
                         await process.wait()
 
-                    self.recording.force_stop = False
                     break
 
                 if process.returncode is not None:
                     logger.info(f"Exit loop recording (normal 0 | abnormal 1): code={process.returncode}, {live_url}")
-                    await self.remove_active_recorder()
-                    self.recording.is_recording = False
+                    await self._cleanup_recording_runtime_state()
                     break
 
                 current_time = time.time()
@@ -529,7 +558,6 @@ class LiveStreamRecorder:
             return_code = process.returncode
             safe_return_codes = {0, 255}
             recording_duration = time.time() - self.recording_start_time
-            self.recording.speed = ""
 
             if not self.should_stop and recording_duration < self.min_valid_recording_duration and not file_has_data:
                 self.recording.last_invalid_recording_time = datetime.now()
@@ -613,7 +641,7 @@ class LiveStreamRecorder:
                     pass
             if stderr_task is not None:
                 await asyncio.gather(stderr_task, return_exceptions=True)
-            self.recording.record_url = None
+            await self._cleanup_recording_runtime_state()
 
         return True
 
@@ -804,6 +832,7 @@ class LiveStreamRecorder:
 
         logger.info(f"Starting direct download - recorder id: {id(self)}, rec_id: {self.recording.rec_id}")
         self.should_stop = False
+        self._runtime_state_released = False
 
         try:
             await self.direct_downloader.start_download()
@@ -816,10 +845,8 @@ class LiveStreamRecorder:
             while True:
                 if self.should_stop or self.recording.force_stop or not self.services.recording_enabled:
                     logger.info(f"Prepare to end direct download: {live_url}")
-                    await self.remove_active_recorder()
-                    self.recording.is_recording = False
+                    await self._cleanup_recording_runtime_state()
                     await self.direct_downloader.stop_download()
-                    self.recording.force_stop = False
                     break
 
                 await asyncio.sleep(1)
@@ -827,8 +854,7 @@ class LiveStreamRecorder:
                 if self.direct_downloader.download_task and self.direct_downloader.download_task.done():
                     break
 
-            await self.remove_active_recorder()
-            self.recording.is_recording = False
+            await self._cleanup_recording_runtime_state()
 
             if not self.recording.is_recording:
                 await self._handle_recording_finished(
@@ -870,7 +896,7 @@ class LiveStreamRecorder:
             self._handle_recording_error(record_name, self._["record_stream_error"])
             return False
         finally:
-            self.recording.record_url = None
+            await self._cleanup_recording_runtime_state()
 
     async def stop_recording_notify(self):
         if desktop_notify.should_push_notification(self.app):
