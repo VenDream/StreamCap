@@ -244,16 +244,10 @@ class RecordingManager:
         async def periodic_check():
             logger.info("Starting periodic live check background task")
             while True:
-                immediate_check_on_startup = self.services.settings_config.user_config.get(
-                    "check_live_on_browser_refresh", True
-                )
-                if immediate_check_on_startup:
-                    await asyncio.sleep(interval)
                 await self.check_free_space()
                 if self.services.recording_enabled:
                     await self.check_all_live_status()
-                if not immediate_check_on_startup:
-                    await asyncio.sleep(interval)
+                await asyncio.sleep(interval)
 
         if not RecordingManager.is_periodic_task_running():
             RecordingManager.set_periodic_task_running(True)
