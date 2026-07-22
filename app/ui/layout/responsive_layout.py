@@ -13,8 +13,12 @@ def is_mobile_device(page: ft.Page) -> bool:
 
 def setup_responsive_layout(page: ft.Page, app: App) -> None:
     _ = app.language_manager.language.get("sidebar", {})
+    is_mobile = is_mobile_device(page)
 
-    if is_mobile_device(page):
+    if app.is_mobile == is_mobile and app.complete_page.content is not None:
+        return
+
+    if is_mobile:
         logger.info("mobile device detected, enable mobile layout")
         app.is_mobile = True
         app.left_navigation_menu.width = 0
@@ -35,7 +39,7 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
 
         app.content_area.expand = True
 
-        app.complete_page = ft.Column(
+        layout = ft.Column(
             expand=True,
             spacing=0,
             controls=[app.content_area, app.bottom_navigation, app.dialog_area, app.snack_bar_area],
@@ -43,7 +47,9 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
     else:
         logger.info("desktop device detected, enable desktop layout")
         app.is_mobile = False
-        app.complete_page = ft.Row(
+        app.left_navigation_menu.width = 192
+        app.left_navigation_menu.visible = True
+        layout = ft.Row(
             expand=True,
             controls=[
                 app.left_navigation_menu,
@@ -53,3 +59,5 @@ def setup_responsive_layout(page: ft.Page, app: App) -> None:
                 app.snack_bar_area,
             ],
         )
+
+    app.complete_page.content = layout
