@@ -95,6 +95,7 @@ class SettingsViewTests(unittest.TestCase):
         page.app = SimpleNamespace(
             services=SimpleNamespace(settings_config=settings_config),
             language_manager=SimpleNamespace(notify_observers=Mock()),
+            shutdown_manager=SimpleNamespace(reschedule=AsyncMock()),
             snack_bar=SimpleNamespace(show_snack_bar=AsyncMock()),
             dialog_area=SimpleNamespace(content=None, update=Mock()),
         )
