@@ -419,33 +419,88 @@ class RecordingCardManager:
 
     async def update_duration(self, recording: Recording):
         """Update the duration text periodically."""
-        while True:
-            update_interval = 1
-            await asyncio.sleep(update_interval)
-            if not recording or recording.rec_id not in self.cards_obj:  # Stop task if card is removed
-                break
-
-            # Skip update when not on recordings page (cards are detached from page tree)
-            current_page = getattr(self.app, "current_page", None)
-            if not current_page or getattr(current_page, "page_name", None) != "recordings":
-                continue
-
-            if recording.is_recording:
-                try:
-                    duration_label = self.cards_obj[recording.rec_id]["duration_label"]
-                    if not self.can_update_control(duration_label):
-                        continue
-                    duration_label.value = self.app.record_manager.get_duration(recording)
-                    duration_label.update()
-                except (ft.core.page.PageDisconnectedException, AssertionError) as e:
-                    logger.debug(f"Update duration failed: {e}")
+        rec_id = recording.rec_id if recording else None
+        try:
+            while True:
+                update_interval = 1
+                await asyncio.sleep(update_interval)
+                if not recording or recording.rec_id not in self.cards_obj:  # Stop task if card is removed
                     break
-                except Exception as e:
-                    logger.debug(f"Update duration failed: {e}")
+
+                if self.app.is_web_mode and not utils.is_web_session_alive(self.app.page):
+                    break
+
+                # Skip update when not on recordings page (cards are detached from page tree)
+                current_page = getattr(self.app, "current_page", None)
+                if not current_page or getattr(current_page, "page_name", None) != "recordings":
+                    continue
+
+                if recording.is_recording:
+                    try:
+                        duration_label = self.cards_obj[recording.rec_id]["duration_label"]
+                        if not self.can_update_control(duration_label):
+                            continue
+                        duration_label.value = self.app.record_manager.get_duration(recording)
+                        duration_label.update()
+                    except (ft.core.page.PageDisconnectedException, AssertionError) as e:
+                        logger.debug(f"Update duration failed: {e}")
+                        break
+                    except Exception as e:
+                        logger.debug(f"Update duration failed: {e}")
+        finally:
+            if rec_id is not None:
+                current_task = self.update_duration_tasks.get(rec_id)
+                if current_task is None or current_task.done():
+                    self.update_duration_tasks.pop(rec_id, None)
 
     def start_update_task(self, recording: Recording):
         """Start a background task to update the duration text."""
-        self.update_duration_tasks[recording.rec_id] = self.app.page.run_task(self.update_duration, recording)
+        existing_task = self.update_duration_tasks.get(recording.rec_id)
+        if existing_task is not None and not existing_task.done():
+            return False
+
+        task = self.app.page.run_task(self.update_duration, recording)
+        self.update_duration_tasks[recording.rec_id] = task
+        task.add_done_callback(
+            lambda finished_task, rec_id=recording.rec_id: self._remove_finished_task(rec_id, finished_task)
+        )
+        return True
+
+    def _remove_finished_task(self, rec_id: str, task) -> None:
+        """Remove a finished task without affecting a replacement task."""
+        if self.update_duration_tasks.get(rec_id) is task:
+            self.update_duration_tasks.pop(rec_id, None)
+
+    def cancel_update_tasks(self) -> int:
+        """Cancel all duration update tasks for the current Web session."""
+        tasks = list(self.update_duration_tasks.values())
+        self.update_duration_tasks.clear()
+
+        cancelled_count = 0
+        for task in tasks:
+            try:
+                if not task.done() and task.cancel():
+                    cancelled_count += 1
+            except Exception as e:
+                logger.debug(f"Failed to cancel duration update task: {e}")
+
+        return cancelled_count
+
+    def restart_update_tasks(self) -> int:
+        """Restart duration tasks after a Web session reconnects."""
+        if not self.app.is_web_mode:
+            return 0
+
+        recordings = getattr(self.app.record_manager, "recordings", []) or []
+        recordings_by_id = {recording.rec_id: recording for recording in recordings}
+        restarted_count = 0
+
+        for rec_id in list(self.cards_obj):
+            recording = recordings_by_id.get(rec_id)
+            if recording is not None and self.start_update_task(recording):
+                restarted_count += 1
+
+        return restarted_count
 
     async def on_card_click(self, recording: Recording):
         """Handle card click events."""

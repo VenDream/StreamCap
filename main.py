@@ -110,6 +110,10 @@ def handle_disconnect(page: ft.Page, app: App) -> Callable:
     """Handle disconnection for web mode."""
 
     async def disconnect(_: ft.ControlEvent) -> None:
+        cancelled_count = app.record_card_manager.cancel_update_tasks()
+        if cancelled_count:
+            logger.info(f"Cancelled {cancelled_count} duration update tasks on Web disconnect")
+
         page.pubsub.unsubscribe_all()
         app.settings.user_config["last_route"] = page.route
         await app.config_manager.save_user_config(app.settings.user_config)
@@ -119,6 +123,17 @@ def handle_disconnect(page: ft.Page, app: App) -> Callable:
             app.services.unregister_ui_bridge(app)
 
     return disconnect
+
+
+def handle_connect(page: ft.Page, app: App) -> Callable:
+    """Handle reconnection for web mode."""
+
+    async def connect(_: ft.ControlEvent) -> None:
+        restarted_count = app.record_card_manager.restart_update_tasks()
+        if restarted_count:
+            logger.info(f"Restarted {restarted_count} duration update tasks on Web reconnect")
+
+    return connect
 
 
 def handle_page_resize(page: ft.Page, app: App) -> Callable:
@@ -164,6 +179,7 @@ async def main(page: ft.Page) -> None:
         if page.web:
             setup_responsive_layout(page, app)
             page.on_resize = handle_page_resize(page, app)
+            page.on_connect = handle_connect(page, app)
             page.on_disconnect = handle_disconnect(page, app)
 
         page.add(app.complete_page)
