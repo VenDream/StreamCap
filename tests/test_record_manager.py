@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import unittest
 from contextlib import suppress
 from types import SimpleNamespace
@@ -123,6 +124,62 @@ class LiveStatusValidationTests(unittest.IsolatedAsyncioTestCase):
         assert recording.is_live is False
         assert recording.status_info == RecordingStatus.LIVE_STATUS_CHECK_ERROR
         recorder.start_recording.assert_not_called()
+
+
+class LiveCheckEventLoopTests(unittest.IsolatedAsyncioTestCase):
+    async def test_check_if_live_forwards_web_session_calls_to_backend_loop(self):
+        backend_loop = asyncio.new_event_loop()
+        backend_started = threading.Event()
+
+        def run_backend_loop():
+            asyncio.set_event_loop(backend_loop)
+            backend_started.set()
+            backend_loop.run_forever()
+
+        backend_thread = threading.Thread(target=run_backend_loop, daemon=True)
+        backend_thread.start()
+        backend_started.wait(timeout=1)
+
+        manager = RecordingManager.__new__(RecordingManager)
+        manager.services = SimpleNamespace(backend_loop=backend_loop)
+        executed_loop = None
+
+        async def backend_check(recording):
+            nonlocal executed_loop
+            executed_loop = asyncio.get_running_loop()
+            return "checked"
+
+        manager._check_if_live = AsyncMock(side_effect=backend_check)
+        recording = SimpleNamespace()
+
+        try:
+            assert await manager.check_if_live(recording) == "checked"
+        finally:
+            backend_loop.call_soon_threadsafe(backend_loop.stop)
+            backend_thread.join(timeout=1)
+            backend_loop.close()
+
+        assert executed_loop is backend_loop
+        manager._check_if_live.assert_awaited_once_with(recording)
+
+    async def test_check_if_live_runs_directly_on_backend_loop(self):
+        current_loop = asyncio.get_running_loop()
+        manager = RecordingManager.__new__(RecordingManager)
+        manager.services = SimpleNamespace(backend_loop=current_loop)
+        executed_loop = None
+
+        async def backend_check(recording):
+            nonlocal executed_loop
+            executed_loop = asyncio.get_running_loop()
+            return "checked"
+
+        manager._check_if_live = AsyncMock(side_effect=backend_check)
+        recording = SimpleNamespace()
+
+        assert await manager.check_if_live(recording) == "checked"
+
+        assert executed_loop is current_loop
+        manager._check_if_live.assert_awaited_once_with(recording)
 
 
 if __name__ == "__main__":

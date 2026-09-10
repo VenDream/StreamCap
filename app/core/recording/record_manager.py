@@ -260,6 +260,17 @@ class RecordingManager:
     async def check_if_live(self, recording: Recording):
         """Check if the live stream is available, fetch stream data and update is_live status."""
 
+        backend_loop = getattr(self.services, "backend_loop", None)
+        current_loop = asyncio.get_running_loop()
+        if backend_loop is not None and backend_loop.is_running() and backend_loop is not current_loop:
+            future = asyncio.run_coroutine_threadsafe(self._check_if_live(recording), backend_loop)
+            return await asyncio.wrap_future(future)
+
+        return await self._check_if_live(recording)
+
+    async def _check_if_live(self, recording: Recording):
+        """Run the live check on the loop that owns platform semaphores."""
+
         recording.manually_stopped = False
         if recording.is_recording or recording.stopping_in_progress:
             logger.debug(f"Skip check_if_live because recording is busy: {recording.url}")
