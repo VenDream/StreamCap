@@ -129,6 +129,11 @@ def handle_connect(page: ft.Page, app: App) -> Callable:
     """Handle reconnection for web mode."""
 
     async def connect(_: ft.ControlEvent) -> None:
+        if app.services is not None:
+            app.services.register_ui_bridge(app)
+        app.record_card_manager.pubsub_subscribe()
+        app.recordings.pubsub_subscribe()
+
         restarted_count = app.record_card_manager.restart_update_tasks()
         if restarted_count:
             logger.info(f"Restarted {restarted_count} duration update tasks on Web reconnect")

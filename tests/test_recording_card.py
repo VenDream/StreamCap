@@ -123,11 +123,23 @@ class WebConnectionHandlerTests(unittest.IsolatedAsyncioTestCase):
         assert app.settings.user_config["last_route"] == "/recordings"
 
     async def test_handle_connect_restarts_duration_tasks(self):
-        card_manager = SimpleNamespace(restart_update_tasks=Mock(return_value=2))
-        app = SimpleNamespace(record_card_manager=card_manager)
+        card_manager = SimpleNamespace(
+            pubsub_subscribe=Mock(),
+            restart_update_tasks=Mock(return_value=2),
+        )
+        recordings_page = SimpleNamespace(pubsub_subscribe=Mock())
+        services = SimpleNamespace(register_ui_bridge=Mock())
+        app = SimpleNamespace(
+            record_card_manager=card_manager,
+            recordings=recordings_page,
+            services=services,
+        )
 
         await handle_connect(SimpleNamespace(), app)(None)
 
+        services.register_ui_bridge.assert_called_once_with(app)
+        card_manager.pubsub_subscribe.assert_called_once_with()
+        recordings_page.pubsub_subscribe.assert_called_once_with()
         card_manager.restart_update_tasks.assert_called_once_with()
 
 
