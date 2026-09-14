@@ -11,6 +11,7 @@ from app.app_manager import App, execute_dir
 from app.auth.auth_manager import AuthManager
 from app.core.runtime.backend_services import BackendServices
 from app.core.runtime.bundled_env import patch_macos_flet_launcher, setup_bundled_flet_view
+from app.core.runtime.flet_web_patches import patch_flet_web_session_disconnect
 from app.core.runtime.paths import prepend_user_bin_dirs, resource_dir
 from app.lifecycle.app_close_handler import handle_app_close
 from app.lifecycle.tray_manager import TrayManager
@@ -273,6 +274,7 @@ if __name__ == "__main__":
     is_web = args.web or platform == "web"
     if is_web:
         services.start_background_loop()
+        patch_flet_web_session_disconnect()
         logger.debug("Running in web mode on http://" + args.host + ":" + str(args.port))
         ft.run(
             main=main,
