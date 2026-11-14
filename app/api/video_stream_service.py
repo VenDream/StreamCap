@@ -79,6 +79,7 @@ async def stream_player(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
   <title>Stream Preview</title>
   <style>
     html, body {{
@@ -118,6 +119,7 @@ async def stream_player(
     controls
     autoplay
     playsinline
+    crossorigin="anonymous"
     webkit-playsinline="true"
     x5-playsinline="true"
     x5-video-player-type="h5"
@@ -130,24 +132,65 @@ async def stream_player(
     const video = document.getElementById("player");
     const errorBox = document.getElementById("error");
     let playerInstance = null;
+    let pendingPlayFn = null;
 
-    function showError(message) {{
+    function hideError() {{
+      errorBox.style.display = "none";
+      errorBox.style.cursor = "default";
+      pendingPlayFn = null;
+    }}
+
+    function showError(message, retryPlayFn = null) {{
       errorBox.textContent = message;
       errorBox.style.display = "flex";
+      pendingPlayFn = retryPlayFn;
+      errorBox.style.cursor = retryPlayFn ? "pointer" : "default";
     }}
 
-    async function tryPlay() {{
+    function isAutoplayBlocked(error) {{
+      return Boolean(error && error.name === "NotAllowedError");
+    }}
+
+    function playbackErrorMessage() {{
+      return streamType === "flv" ? "FLV playback failed." : "HLS playback failed.";
+    }}
+
+    async function tryPlay(playFn = () => video.play()) {{
       try {{
-        await video.play();
-      }} catch (_error) {{
-        video.muted = true;
-        try {{
-          await video.play();
-        }} catch (_mutedError) {{
-          showError("Autoplay blocked. Tap play to continue.");
+        await playFn();
+        hideError();
+      }} catch (error) {{
+        if (error && error.name === "AbortError") {{
+          return;
         }}
+        if (isAutoplayBlocked(error)) {{
+          video.muted = true;
+          try {{
+            await playFn();
+            hideError();
+            return;
+          }} catch (mutedError) {{
+            if (isAutoplayBlocked(mutedError)) {{
+              showError("Autoplay blocked. Tap play to continue.", playFn);
+              return;
+            }}
+          }}
+        }}
+        showError(playbackErrorMessage());
       }}
     }}
+
+    errorBox.addEventListener("click", async () => {{
+      if (!pendingPlayFn) {{
+        return;
+      }}
+      const playFn = pendingPlayFn;
+      hideError();
+      video.muted = false;
+      await tryPlay(playFn);
+    }});
+
+    video.addEventListener("playing", hideError);
 
     function destroyPlayer() {{
       try {{
@@ -161,12 +204,6 @@ async def stream_player(
 
     async function initPlayer() {{
       if (streamType === "m3u8") {{
-        if (video.canPlayType("application/vnd.apple.mpegurl")) {{
-          video.src = streamUrl;
-          await tryPlay();
-          return;
-        }}
-
         if (window.Hls && window.Hls.isSupported()) {{
           playerInstance = new Hls({{
             enableWorker: true,
@@ -174,12 +211,19 @@ async def stream_player(
           }});
           playerInstance.loadSource(streamUrl);
           playerInstance.attachMedia(video);
-          playerInstance.on(Hls.Events.MANIFEST_PARSED, tryPlay);
+          playerInstance.on(Hls.Events.MANIFEST_PARSED, () => tryPlay());
           playerInstance.on(Hls.Events.ERROR, (_event, data) => {{
             if (data && data.fatal) {{
               showError("HLS playback failed.");
             }}
           }});
+          return;
+        }}
+
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+          video.addEventListener("error", () => showError("HLS playback failed."));
+          video.src = streamUrl;
+          await tryPlay();
           return;
         }}
 
@@ -194,18 +238,12 @@ async def stream_player(
             url: streamUrl,
             isLive: true,
           }});
+          playerInstance.on(flvjs.Events.ERROR, () => {{
+            showError("FLV playback failed.");
+          }});
           playerInstance.attachMediaElement(video);
           playerInstance.load();
-          try {{
-            await playerInstance.play();
-          }} catch (_error) {{
-            video.muted = true;
-            try {{
-              await playerInstance.play();
-            }} catch (_mutedError) {{
-              showError("FLV autoplay blocked. Tap play to continue.");
-            }}
-          }}
+          await tryPlay(() => playerInstance.play());
           return;
         }}
 
